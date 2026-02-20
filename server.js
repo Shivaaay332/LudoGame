@@ -11,8 +11,13 @@ app.use(express.static('public'));
 const rooms = {};
 
 io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
     socket.on('joinRoom', (roomId) => {
+        if (!roomId || typeof roomId !== 'string') return;
+        
         if (!rooms[roomId]) {
+            // ORDER: Blue, Green, Red, Yellow
             rooms[roomId] = { 
                 players: [], host: socket.id, status: 'waiting',
                 colors: ['blue', 'green', 'red', 'yellow'],
@@ -22,18 +27,24 @@ io.on('connection', (socket) => {
         
         let room = rooms[roomId];
 
-        // BUG FIX: Prevent multiple joins from same mobile/tab
-        if (room.players.some(p => p.id === socket.id)) return;
+        // Agar user already room me hai to dobara status bhej do (Freeze fix)
+        let pIndex = room.players.findIndex(p => p.id === socket.id);
+        if (pIndex !== -1) {
+            socket.emit('joined', { color: room.players[pIndex].color, roomId: roomId, isHost: room.host === socket.id });
+            io.to(roomId).emit('updatePlayers', room.players);
+            return;
+        }
 
         if (room.status === 'playing') return socket.emit('errorMsg', 'Game already started!');
-        if (room.players.length >= 4) return socket.emit('errorMsg', 'Room is full!');
+        
+        let availableColors = room.colors.filter(c => !room.players.some(p => p.color === c));
+        if (availableColors.length === 0) return socket.emit('errorMsg', 'Room is full!');
 
-        let assignedColor = room.colors[room.players.length];
+        let assignedColor = availableColors[0];
         room.players.push({ id: socket.id, color: assignedColor, online: true });
         
         socket.join(roomId);
         socket.emit('joined', { color: assignedColor, roomId: roomId, isHost: room.host === socket.id });
-        
         io.to(roomId).emit('updatePlayers', room.players);
     });
 
@@ -87,23 +98,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        // Find room and mark player offline or delete empty room
         for (let roomId in rooms) {
             let room = rooms[roomId];
             let pIndex = room.players.findIndex(p => p.id === socket.id);
             
             if (pIndex !== -1) {
                 if (room.status === 'waiting') {
-                    room.players.splice(pIndex, 1);
+                    room.players.splice(pIndex, 1); // Remove player
+                    
                     if (room.players.length === 0) {
-                        delete rooms[roomId]; // Room code is free again!
+                        delete rooms[roomId]; // Room free for reuse!
                     } else {
-                        if (room.host === socket.id) room.host = room.players[0].id; // Transfer host
+                        if (room.host === socket.id) room.host = room.players[0].id; // Assign new host
                         io.to(roomId).emit('updatePlayers', room.players);
                     }
                 } else {
-                    // Mark as offline (Red Dot)
-                    room.players[pIndex].online = false;
+                    room.players[pIndex].online = false; // Mark offline
                     io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
                 }
             }
