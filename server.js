@@ -11,49 +11,41 @@ app.use(express.static('public'));
 const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
     socket.on('joinRoom', (roomId) => {
         if (!rooms[roomId]) {
             rooms[roomId] = { 
-                players: [], 
-                host: socket.id, 
-                status: 'waiting',
+                players: [], host: socket.id, status: 'waiting',
                 colors: ['blue', 'green', 'red', 'yellow'],
-                activeColors: [],
-                rollStats: {} // Har 4-6 chal me 6 lane ke liye tracker
+                activeColors: [], rollStats: {} 
             };
         }
         
         let room = rooms[roomId];
-        if (room.status === 'playing') {
-            return socket.emit('errorMsg', 'Game already started!');
-        }
-        if (room.players.length >= 4) {
-            return socket.emit('errorMsg', 'Room is full!');
-        }
+
+        // BUG FIX: Prevent multiple joins from same mobile/tab
+        if (room.players.some(p => p.id === socket.id)) return;
+
+        if (room.status === 'playing') return socket.emit('errorMsg', 'Game already started!');
+        if (room.players.length >= 4) return socket.emit('errorMsg', 'Room is full!');
 
         let assignedColor = room.colors[room.players.length];
-        room.players.push({ id: socket.id, color: assignedColor });
+        room.players.push({ id: socket.id, color: assignedColor, online: true });
         
         socket.join(roomId);
         socket.emit('joined', { color: assignedColor, roomId: roomId, isHost: room.host === socket.id });
         
-        io.to(roomId).emit('updatePlayers', room.players.map(p => p.color));
+        io.to(roomId).emit('updatePlayers', room.players);
     });
 
     socket.on('startGame', (roomId) => {
         let room = rooms[roomId];
-        if(room && room.host === socket.id) {
+        if(room && room.host === socket.id && room.players.length > 0) {
             room.status = 'playing';
             room.activeColors = room.players.map(p => p.color);
             room.turnIdx = 0;
-            
-            // Stats setup
             room.activeColors.forEach(c => {
-                room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 }; // Target: 4, 5, ya 6
+                room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
             });
-
             io.to(roomId).emit('gameStarted', room.activeColors);
         }
     });
@@ -74,22 +66,16 @@ io.on('connection', (socket) => {
         if(!room) return;
 
         let stats = room.rollStats[data.color];
-        stats.count++; // Player ki chaal gin rahe hain
-
-        let roll = Math.floor(Math.random() * 6) + 1; // Normal random roll
-
-        // Agar target hit ho gaya to forcefully 6 de do
-        if (stats.count >= stats.target) {
-            roll = 6;
+        if(stats) {
+            stats.count++;
+            let roll = Math.floor(Math.random() * 6) + 1;
+            if (stats.count >= stats.target) roll = 6;
+            if (roll === 6) {
+                stats.count = 0;
+                stats.target = Math.floor(Math.random() * 3) + 4;
+            }
+            io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
         }
-
-        // Agar 6 aa gaya (kismat se ya force se), counter reset kardo
-        if (roll === 6) {
-            stats.count = 0;
-            stats.target = Math.floor(Math.random() * 3) + 4; // Naya target set karo
-        }
-
-        io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
     });
 
     socket.on('moveToken', (data) => {
@@ -101,7 +87,27 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
+        // Find room and mark player offline or delete empty room
+        for (let roomId in rooms) {
+            let room = rooms[roomId];
+            let pIndex = room.players.findIndex(p => p.id === socket.id);
+            
+            if (pIndex !== -1) {
+                if (room.status === 'waiting') {
+                    room.players.splice(pIndex, 1);
+                    if (room.players.length === 0) {
+                        delete rooms[roomId]; // Room code is free again!
+                    } else {
+                        if (room.host === socket.id) room.host = room.players[0].id; // Transfer host
+                        io.to(roomId).emit('updatePlayers', room.players);
+                    }
+                } else {
+                    // Mark as offline (Red Dot)
+                    room.players[pIndex].online = false;
+                    io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
+                }
+            }
+        }
     });
 });
 
