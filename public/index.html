@@ -56,24 +56,18 @@
         .base-inner { background: white; border-radius: 15px; width: 65%; height: 65%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15%; padding: 15%; box-shadow: inset 0 5px 15px rgba(0,0,0,0.3); }
         .base-spot { width: 100%; height: 100%; border-radius: 50%; background: #eaeaea; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 0 3px 6px rgba(0,0,0,0.2);}
 
-        /* DICE INSIDE THE BASE SO IT NEVER OVERFLOWS */
         .dice-neon-container {
-            position: absolute; width: 50px; height: 50px; 
+            position: absolute; width: 45px; height: 45px; 
             background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 10px; display: none; justify-content: center; align-items: center;
             backdrop-filter: blur(5px); z-index: 100;
         }
-        /* Corners facing outward */
-        #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); }
-        #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); }
-        #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); }
-        #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
+        #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); } #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); } #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); } #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
 
         .dice-box {
-            width: 40px; height: 40px; background: #fff;
+            width: 35px; height: 35px; background: #fff;
             border: 2px solid #444; border-radius: 6px; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-            padding: 4px; cursor: pointer;
-            transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 0.3s;
+            padding: 3px; cursor: pointer; transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 0.3s;
         }
         .dot { background-color: #333; border-radius: 50%; width: 100%; height: 100%; visibility: hidden; }
         .active-dice-box { transform: scale(1.2) rotate(calc(var(--board-rot, 0deg) * -1)); outline: 3px solid #fff; }
@@ -141,7 +135,6 @@
         const socket = io(); 
         let myRoomId = "", myColor = "", isHost = false;
         
-        // Perspective Map
         const colorRotations = { 'blue': '0deg', 'green': '180deg', 'red': '-90deg', 'yellow': '90deg' };
         const dicePatterns = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
         const starPositions = [[7,2], [3,7], [2,9], [7,13], [9,14], [13,9], [14,7], [9,3]]; 
@@ -150,7 +143,9 @@
         
         let activeColors = [];
         let gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
-        let turnIdx = 0, currentRoll = 0, hasRolled = false, isAnimating = false;
+        
+        // STRICT LOCKS ADDED HERE
+        let turnIdx = 0, currentRoll = 0, hasRolled = false, isAnimating = false, isRequestingRoll = false;
         let cells = {};
 
         function initEmptyBoard() {
@@ -169,7 +164,6 @@
             }
         }
 
-        // Dynamically build ONLY the active players' bases and dice
         function buildActiveBases() {
             document.querySelectorAll('.base').forEach(e => e.remove());
             ['red','green','yellow','blue'].forEach(color => {
@@ -177,7 +171,6 @@
                 let winDisp = document.createElement('div'); winDisp.className = 'winner-display'; winDisp.id = `win-disp-${color}`; base.appendChild(winDisp);
                 let inner = document.createElement('div'); inner.className = 'base-inner';
                 
-                // Only spawn tokens and dice if player exists in activeColors
                 if (activeColors.includes(color)) {
                     for(let i=0; i<4; i++) {
                         let spot = document.createElement('div'); spot.className = 'base-spot'; spot.id = `spot_${color}_${i}`;
@@ -186,7 +179,6 @@
                         spot.appendChild(t); inner.appendChild(spot);
                     }
                     
-                    // Dice Container injected INSIDE the base. Fixed the ID and layout issues.
                     let diceHTML = `<div class="dice-neon-container" id="box-${color}" style="display:flex;">
                                         <div class="dice-box" id="dice-${color}" onclick="requestDiceRoll('${color}')">
                                             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -201,7 +193,6 @@
             });
         }
 
-        // --- MULTIPLAYER LOBBY LOGIC ---
         function joinRoom() {
             const input = document.getElementById('roomIdInput').value;
             if(!input) return alert("Enter Room Code!");
@@ -210,8 +201,7 @@
         }
 
         socket.on('joined', (data) => {
-            myColor = data.color;
-            isHost = data.isHost;
+            myColor = data.color; isHost = data.isHost;
             document.getElementById('roomCodeDisplay').innerText = `Room: ${data.roomId}`;
             document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myColor.toUpperCase()}</b>`;
             document.getElementById('gameWrapper').style.setProperty('--board-rot', colorRotations[myColor]);
@@ -220,13 +210,10 @@
         socket.on('updatePlayers', (players) => {
             let lobbyText = "Players Joined:<br>";
             players.forEach((p, i) => { lobbyText += `${i+1}. ${p.toUpperCase()} <br>`; });
-            
             if (isHost) {
                 lobbyText += "<br>You are the Host!";
                 document.getElementById('startBtn').style.display = 'block';
-            } else {
-                lobbyText += "<br>Waiting for Host to start...";
-            }
+            } else { lobbyText += "<br>Waiting for Host to start..."; }
             document.getElementById('lobbyStatus').innerHTML = lobbyText;
         });
 
@@ -239,25 +226,35 @@
             activeColors = colors;
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             buildActiveBases();
-            turnIdx = 0; updateTurnStatus();
+            
+            // Re-initialize all locks
+            turnIdx = 0; currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
+            updateTurnStatus();
         });
 
         socket.on('gameRestarted', (colors) => {
             activeColors = colors;
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             document.querySelectorAll('.winner-display').forEach(w => w.style.display = 'none');
-            turnIdx = 0; updateTurnStatus(); render();
+            
+            // BUG FIX: Completely clear locks on restart!
+            turnIdx = 0; currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
+            
+            updateTurnStatus(); render();
         });
 
         socket.on('errorMsg', (msg) => alert(msg));
 
-        // --- GAMEPLAY LOGIC ---
+        // --- GAMEPLAY LOGIC (WITH STRICT LOCKS) ---
         function requestDiceRoll(color) {
-            if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled) return; 
+            // SPAM CLICK PREVENTION
+            if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll) return; 
+            isRequestingRoll = true; // Lock immediately
             socket.emit('rollDice', { roomId: myRoomId, color: color });
         }
 
         socket.on('diceRolled', (data) => {
+            isRequestingRoll = false; // Unlock roll request
             isAnimating = true; playSound('dice');
             const d = document.getElementById(`dice-${data.color}`); 
             if(d) d.classList.add('rolling');
@@ -277,8 +274,10 @@
                     if(color === myColor) document.getElementById(`t_${color}_${i}`).classList.add('highlight'); 
                 }
             });
-            if(playable.length === 0 && color === myColor) setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
-            else if(playable.length === 1 && color === myColor) setTimeout(() => requestTokenMove(color, playable[0]), 400);
+            // Auto move removed completely. Users must manually click their tokens.
+            if(playable.length === 0 && color === myColor) {
+                setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
+            }
         }
 
         function requestTokenMove(color, idx) {
@@ -287,6 +286,8 @@
             if(pos === -1 && currentRoll !== 6) return;
             if(pos !== -1 && pos + currentRoll > 56) return;
             
+            // INSTANT LOCK SO THEY CAN'T DOUBLE CLICK A TOKEN
+            hasRolled = false; 
             document.querySelectorAll('.token').forEach(t => t.classList.remove('highlight'));
             socket.emit('moveToken', { roomId: myRoomId, color: color, idx: idx });
         }
@@ -301,13 +302,13 @@
             let extraTurn = (currentRoll === 6);
             if(target === 56) {
                 extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
-            } else if(target < 51) {
+            } else if(target <= 50) { // KILL LOGIC FIXED
                 let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
                 for (const c of activeColors) {
                     if (c === color) continue; 
                     for (let i = 0; i < gameState[c].length; i++) {
                         let enemyPos = gameState[c][i];
-                        if(enemyPos !== -1 && enemyPos < 51) {
+                        if(enemyPos !== -1 && enemyPos <= 50) {
                             let enemyIdx = (enemyPos + {red:0, green:13, yellow:26, blue:39}[c])%52;
                             if (myGlobalIdx === enemyIdx && !starPositions.some(s => s[0]===mainPath[myGlobalIdx][0] && s[1]===mainPath[myGlobalIdx][1])) {
                                 extraTurn = true; playSound('kill');
@@ -335,7 +336,10 @@
             statusEl.style.color = `var(--${color})`;
             document.querySelectorAll('.dice-box').forEach(d => d.classList.remove('active-dice-box'));
             if(document.getElementById(`dice-${color}`)) document.getElementById(`dice-${color}`).classList.add('active-dice-box');
+            
+            // Final guarantee lock resets on turn change
             hasRolled = false;
+            isRequestingRoll = false;
         }
 
         function drawDice(color, num) {
