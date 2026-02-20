@@ -35,29 +35,26 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('updatePlayers', room.players.map(p => p.color));
     });
 
-    // Handle Dice Roll
     socket.on('rollDice', (data) => {
-        // Generate random roll on server to prevent cheating
         let roll = Math.floor(Math.random() * 6) + 1;
         io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
     });
 
-    // Handle Token Move
     socket.on('moveToken', (data) => {
         io.to(data.roomId).emit('tokenMoved', { color: data.color, idx: data.idx });
     });
 
-    // Handle Turn Change
     socket.on('passTurn', (data) => {
         io.to(data.roomId).emit('turnChanged');
     });
 
     socket.on('disconnect', () => {
         console.log('User disconnected');
-        // Handle player leaving (Complex logic skipped for brevity)
     });
 });
 
-server.listen(3000, '0.0.0.0', () => {
-    console.log('Ludo Server running on http://localhost:3000');
+// ✨ YAHAN MAIN CHANGE KIYA HAI ✨
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
