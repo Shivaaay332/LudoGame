@@ -18,11 +18,12 @@
         #fireworks { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
         
         /* LOBBY UI */
-        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
+        #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
         .lobby-box { background: #24243e; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(0,255,255,0.2); width: 90%; max-width: 400px;}
         input { padding: 12px; font-size: 18px; border-radius: 8px; border: none; text-align: center; outline: none; margin-bottom: 15px; width: 100%; font-weight: bold; }
         button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; font-size: 18px; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;}
         button:active { transform: scale(0.95); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-green { background: var(--green); margin-top: 10px; display: none; }
         .btn-red { background: var(--red); margin-top: 5px; display: none; }
         
@@ -47,13 +48,10 @@
         .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
         .cell.has-many { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; }
         
-        /* NEW PROFESSIONAL SAFE ZONE (NO TEXT, JUST PATTERN) */
+        /* ✨ NEW PROFESSIONAL SAFE ZONE (No Star text, No Shrinking) ✨ */
         .safe-zone {
-            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08) 5px, transparent 5px, transparent 10px);
-        }
-        .safe-zone::after {
-            content: ''; position: absolute; width: 40%; height: 40%;
-            background: rgba(0,0,0,0.15); border-radius: 3px; transform: rotate(45deg);
+            background-color: rgba(0,0,0,0.1);
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 3px, transparent 3px, transparent 6px);
         }
 
         .base { position: absolute; width: 40%; height: 40%; border: 2px solid white; display: flex; justify-content: center; align-items: center; flex-direction: column;}
@@ -72,9 +70,9 @@
         }
         #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); } #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); } #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); } #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
 
-        /* ONLINE/OFFLINE INDICATOR */
+        /* 🟢🔴 ONLINE/OFFLINE DOT */
         .online-dot {
-            position: absolute; top: -6px; right: -6px; width: 16px; height: 16px;
+            position: absolute; top: -6px; right: -6px; width: 14px; height: 14px;
             border-radius: 50%; background: var(--green); border: 2px solid white;
             box-shadow: 0 0 5px rgba(0,0,0,0.5); z-index: 110;
         }
@@ -175,7 +173,6 @@
                     if (r==8 && c>9 && c<15) cell.style.backgroundColor = 'rgba(255, 204, 0, 0.2)'; 
                     if (c==8 && r>9 && r<15) cell.style.backgroundColor = 'rgba(0, 132, 255, 0.2)'; 
                     
-                    // NEW PROFESSIONAL SAFE ZONE
                     if(starPositions.some(p => p[0]==r && p[1]==c)) cell.classList.add('safe-zone');
                     
                     board.appendChild(cell); cells[`${r}_${c}`] = cell;
@@ -198,7 +195,6 @@
                         spot.appendChild(t); inner.appendChild(spot);
                     }
                     
-                    // Added Online/Offline Dot Indicator
                     let diceHTML = `<div class="dice-neon-container" id="box-${color}" style="display:flex;">
                                         <div class="online-dot" id="status-${color}"></div>
                                         <div class="dice-box" id="dice-${color}" onclick="requestDiceRoll('${color}')">
@@ -214,20 +210,30 @@
             });
         }
 
+        // --- LOBBY LOGIC ---
         function joinRoom() {
             const input = document.getElementById('roomIdInput').value;
             if(!input) return alert("Enter Room Code!");
             
-            // Hide join UI immediately
-            document.getElementById('roomIdInput').style.display = 'none';
-            document.getElementById('joinBtn').style.display = 'none';
-            document.getElementById('lobbyStatus').innerHTML = "Joining...";
+            // TUI FIX: Button disabled temporarily so user doesn't spam click
+            document.getElementById('joinBtn').disabled = true;
+            document.getElementById('lobbyStatus').innerHTML = "Connecting...";
             
             myRoomId = input;
             socket.emit('joinRoom', myRoomId);
         }
 
+        socket.on('errorMsg', (msg) => {
+            alert(msg);
+            document.getElementById('joinBtn').disabled = false;
+            document.getElementById('lobbyStatus').innerHTML = "";
+        });
+
         socket.on('joined', (data) => {
+            // SUCCESS: Now hide inputs
+            document.getElementById('roomIdInput').style.display = 'none';
+            document.getElementById('joinBtn').style.display = 'none';
+            
             myColor = data.color; isHost = data.isHost;
             document.getElementById('roomCodeDisplay').innerText = `Room: ${data.roomId}`;
             document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myColor.toUpperCase()}</b>`;
@@ -238,7 +244,6 @@
             let lobbyText = "Players Joined:<br>";
             players.forEach((p, i) => { 
                 lobbyText += `${i+1}. ${p.color.toUpperCase()} <br>`; 
-                // Update online dots if game already built
                 let dot = document.getElementById(`status-${p.color}`);
                 if(dot) {
                     if(p.online) dot.classList.remove('offline');
@@ -258,9 +263,7 @@
 
         socket.on('playerStatus', (data) => {
             let dot = document.getElementById(`status-${data.color}`);
-            if(dot) {
-                if(data.status === 'offline') dot.classList.add('offline');
-            }
+            if(dot && data.status === 'offline') dot.classList.add('offline');
         });
 
         function startGame() { socket.emit('startGame', myRoomId); }
@@ -282,17 +285,14 @@
             winnersRanking = [];
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             document.querySelectorAll('.winner-display').forEach(w => w.style.display = 'none');
+            
+            buildActiveBases(); // Reset board physically
+            
             turnIdx = 0; currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
             updateTurnStatus(); render();
         });
 
-        socket.on('errorMsg', (msg) => {
-            alert(msg);
-            document.getElementById('roomIdInput').style.display = 'block';
-            document.getElementById('joinBtn').style.display = 'block';
-            document.getElementById('lobbyStatus').innerHTML = "";
-        });
-
+        // --- GAMEPLAY LOGIC ---
         function requestDiceRoll(color) {
             if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll || winnersRanking.includes(color)) return; 
             isRequestingRoll = true; 
@@ -321,12 +321,14 @@
                 }
             });
             
-            if(playable.length === 0 && color === myColor) {
-                setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
-            } 
-            // RESTORED: Auto-Move if only 1 option available
-            else if(playable.length === 1 && color === myColor) {
-                setTimeout(() => requestTokenMove(color, playable[0]), 400);
+            if(color === myColor) {
+                if(playable.length === 0) {
+                    setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
+                } 
+                // AUTO-MOVE RESTORED: If only 1 move is possible, execute it.
+                else if(playable.length === 1) {
+                    setTimeout(() => requestTokenMove(color, playable[0]), 400);
+                }
             }
         }
 
@@ -350,7 +352,6 @@
             
             let extraTurn = (currentRoll === 6);
             
-            // HALAL FREEZE FIX
             if(target === 56) {
                 extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
                 if(gameState[color].every(p => p === 56)) {
@@ -360,7 +361,7 @@
                 }
             } else if(target <= 50) { 
                 let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
-                let killed = false;
+                let killed = false; // FLAG FOR SINGLE KILL
                 
                 for (const c of activeColors) {
                     if (c === color) continue; 
@@ -372,31 +373,40 @@
                                 extraTurn = true; playSound('kill');
                                 for(let k = enemyPos; k >= -1; k--) { gameState[c][i] = k; render(); await new Promise(r => setTimeout(r, 30)); }
                                 killed = true;
-                                break; // REAL LUDO RULE: KILL ONLY ONE TOKEN
+                                break; // ONLY KILL ONE TOKEN
                             }
                         }
                     }
-                    if(killed) break; // IF KILLED ONCE, STOP CHECKING OTHERS
+                    if(killed) break; // STOP SEARCHING ONCE ONE IS KILLED
                 }
             }
 
             isAnimating = false;
-            if (color === myColor) {
-                if(extraTurn) updateTurnStatus(); else socket.emit('passTurn', {roomId: myRoomId});
+            
+            // Sync everyone
+            if (extraTurn) {
+                updateTurnStatus(); 
+            } else {
+                if (color === myColor) socket.emit('passTurn', {roomId: myRoomId});
             }
         });
 
         socket.on('turnChanged', () => { turnIdx = (turnIdx + 1) % activeColors.length; updateTurnStatus(); });
 
         function updateTurnStatus() {
-            if(activeColors.length < 1) return;
+            if(activeColors.length <= 1) return;
+            
+            if(winnersRanking.length >= activeColors.length - 1) { 
+                let statusEl = document.getElementById('turnStatus');
+                statusEl.innerHTML = "Game Over! 🏁";
+                statusEl.style.color = "white";
+                return; 
+            }
+
             let color = activeColors[turnIdx];
             
-            // Skip player if they have won
             if(winnersRanking.includes(color)) {
-                if(color === myColor) {
-                    socket.emit('passTurn', {roomId: myRoomId});
-                }
+                if(color === myColor) socket.emit('passTurn', {roomId: myRoomId});
                 return;
             }
 
