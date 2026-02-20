@@ -46,7 +46,15 @@
 
         .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
         .cell.has-many { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; }
-        .star { display: inline-block; font-size: 14px; transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 1s; }
+        
+        /* NEW PROFESSIONAL SAFE ZONE (NO TEXT, JUST PATTERN) */
+        .safe-zone {
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08) 5px, transparent 5px, transparent 10px);
+        }
+        .safe-zone::after {
+            content: ''; position: absolute; width: 40%; height: 40%;
+            background: rgba(0,0,0,0.15); border-radius: 3px; transform: rotate(45deg);
+        }
 
         .base { position: absolute; width: 40%; height: 40%; border: 2px solid white; display: flex; justify-content: center; align-items: center; flex-direction: column;}
         .base-red { top: 0; left: 0; background: var(--red); } .base-green { top: 0; right: 0; background: var(--green); } .base-yellow { bottom: 0; right: 0; background: var(--yellow); } .base-blue { bottom: 0; left: 0; background: var(--blue); }
@@ -63,6 +71,14 @@
             backdrop-filter: blur(5px); z-index: 100;
         }
         #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); } #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); } #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); } #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
+
+        /* ONLINE/OFFLINE INDICATOR */
+        .online-dot {
+            position: absolute; top: -6px; right: -6px; width: 16px; height: 16px;
+            border-radius: 50%; background: var(--green); border: 2px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); z-index: 110;
+        }
+        .online-dot.offline { background: var(--red); }
 
         .dice-box {
             width: 35px; height: 35px; background: #fff;
@@ -99,7 +115,7 @@
         <div class="lobby-box">
             <h1 style="color:var(--yellow); margin-bottom: 10px;">Ludo Multiplayer</h1>
             <input type="text" id="roomIdInput" placeholder="Enter Room Code">
-            <button onclick="joinRoom()">Join Game</button>
+            <button id="joinBtn" onclick="joinRoom()">Join Game</button>
             <div id="lobbyStatus" style="margin-top: 15px; color:#aaa; font-weight:bold;"></div>
             <button id="startBtn" class="btn-green" onclick="startGame()">▶ Start Game</button>
         </div>
@@ -134,6 +150,7 @@
     <script>
         const socket = io(); 
         let myRoomId = "", myColor = "", isHost = false;
+        let winnersRanking = [];
         
         const colorRotations = { 'blue': '0deg', 'green': '180deg', 'red': '-90deg', 'yellow': '90deg' };
         const dicePatterns = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
@@ -144,7 +161,6 @@
         let activeColors = [];
         let gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
         
-        // STRICT LOCKS ADDED HERE
         let turnIdx = 0, currentRoll = 0, hasRolled = false, isAnimating = false, isRequestingRoll = false;
         let cells = {};
 
@@ -158,7 +174,10 @@
                     if (c==8 && r>1 && r<7) cell.style.backgroundColor = 'rgba(0, 184, 76, 0.2)'; 
                     if (r==8 && c>9 && c<15) cell.style.backgroundColor = 'rgba(255, 204, 0, 0.2)'; 
                     if (c==8 && r>9 && r<15) cell.style.backgroundColor = 'rgba(0, 132, 255, 0.2)'; 
-                    if(starPositions.some(p => p[0]==r && p[1]==c)) cell.innerHTML = '<span class="star">⭐</span>';
+                    
+                    // NEW PROFESSIONAL SAFE ZONE
+                    if(starPositions.some(p => p[0]==r && p[1]==c)) cell.classList.add('safe-zone');
+                    
                     board.appendChild(cell); cells[`${r}_${c}`] = cell;
                 }
             }
@@ -179,7 +198,9 @@
                         spot.appendChild(t); inner.appendChild(spot);
                     }
                     
+                    // Added Online/Offline Dot Indicator
                     let diceHTML = `<div class="dice-neon-container" id="box-${color}" style="display:flex;">
+                                        <div class="online-dot" id="status-${color}"></div>
                                         <div class="dice-box" id="dice-${color}" onclick="requestDiceRoll('${color}')">
                                             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
                                             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -196,6 +217,12 @@
         function joinRoom() {
             const input = document.getElementById('roomIdInput').value;
             if(!input) return alert("Enter Room Code!");
+            
+            // Hide join UI immediately
+            document.getElementById('roomIdInput').style.display = 'none';
+            document.getElementById('joinBtn').style.display = 'none';
+            document.getElementById('lobbyStatus').innerHTML = "Joining...";
+            
             myRoomId = input;
             socket.emit('joinRoom', myRoomId);
         }
@@ -209,12 +236,31 @@
 
         socket.on('updatePlayers', (players) => {
             let lobbyText = "Players Joined:<br>";
-            players.forEach((p, i) => { lobbyText += `${i+1}. ${p.toUpperCase()} <br>`; });
-            if (isHost) {
+            players.forEach((p, i) => { 
+                lobbyText += `${i+1}. ${p.color.toUpperCase()} <br>`; 
+                // Update online dots if game already built
+                let dot = document.getElementById(`status-${p.color}`);
+                if(dot) {
+                    if(p.online) dot.classList.remove('offline');
+                    else dot.classList.add('offline');
+                }
+            });
+            
+            if (isHost && players.length > 0) {
                 lobbyText += "<br>You are the Host!";
                 document.getElementById('startBtn').style.display = 'block';
-            } else { lobbyText += "<br>Waiting for Host to start..."; }
+            } else { 
+                document.getElementById('startBtn').style.display = 'none';
+                lobbyText += "<br>Waiting for Host to start..."; 
+            }
             document.getElementById('lobbyStatus').innerHTML = lobbyText;
+        });
+
+        socket.on('playerStatus', (data) => {
+            let dot = document.getElementById(`status-${data.color}`);
+            if(dot) {
+                if(data.status === 'offline') dot.classList.add('offline');
+            }
         });
 
         function startGame() { socket.emit('startGame', myRoomId); }
@@ -224,37 +270,37 @@
             document.getElementById('lobby').style.display = 'none';
             if(isHost) document.getElementById('restartBtn').style.display = 'block';
             activeColors = colors;
+            winnersRanking = [];
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             buildActiveBases();
-            
-            // Re-initialize all locks
             turnIdx = 0; currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
             updateTurnStatus();
         });
 
         socket.on('gameRestarted', (colors) => {
             activeColors = colors;
+            winnersRanking = [];
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             document.querySelectorAll('.winner-display').forEach(w => w.style.display = 'none');
-            
-            // BUG FIX: Completely clear locks on restart!
             turnIdx = 0; currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
-            
             updateTurnStatus(); render();
         });
 
-        socket.on('errorMsg', (msg) => alert(msg));
+        socket.on('errorMsg', (msg) => {
+            alert(msg);
+            document.getElementById('roomIdInput').style.display = 'block';
+            document.getElementById('joinBtn').style.display = 'block';
+            document.getElementById('lobbyStatus').innerHTML = "";
+        });
 
-        // --- GAMEPLAY LOGIC (WITH STRICT LOCKS) ---
         function requestDiceRoll(color) {
-            // SPAM CLICK PREVENTION
-            if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll) return; 
-            isRequestingRoll = true; // Lock immediately
+            if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll || winnersRanking.includes(color)) return; 
+            isRequestingRoll = true; 
             socket.emit('rollDice', { roomId: myRoomId, color: color });
         }
 
         socket.on('diceRolled', (data) => {
-            isRequestingRoll = false; // Unlock roll request
+            isRequestingRoll = false; 
             isAnimating = true; playSound('dice');
             const d = document.getElementById(`dice-${data.color}`); 
             if(d) d.classList.add('rolling');
@@ -274,9 +320,13 @@
                     if(color === myColor) document.getElementById(`t_${color}_${i}`).classList.add('highlight'); 
                 }
             });
-            // Auto move removed completely. Users must manually click their tokens.
+            
             if(playable.length === 0 && color === myColor) {
                 setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
+            } 
+            // RESTORED: Auto-Move if only 1 option available
+            else if(playable.length === 1 && color === myColor) {
+                setTimeout(() => requestTokenMove(color, playable[0]), 400);
             }
         }
 
@@ -286,7 +336,6 @@
             if(pos === -1 && currentRoll !== 6) return;
             if(pos !== -1 && pos + currentRoll > 56) return;
             
-            // INSTANT LOCK SO THEY CAN'T DOUBLE CLICK A TOKEN
             hasRolled = false; 
             document.querySelectorAll('.token').forEach(t => t.classList.remove('highlight'));
             socket.emit('moveToken', { roomId: myRoomId, color: color, idx: idx });
@@ -300,10 +349,19 @@
             else { for(let p=currentPos+1; p<=target; p++) { gameState[color][idx] = p; playSound('move'); render(); await new Promise(r => setTimeout(r, 150)); } }
             
             let extraTurn = (currentRoll === 6);
+            
+            // HALAL FREEZE FIX
             if(target === 56) {
                 extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
-            } else if(target <= 50) { // KILL LOGIC FIXED
+                if(gameState[color].every(p => p === 56)) {
+                    if(!winnersRanking.includes(color)) winnersRanking.push(color);
+                    let disp = document.getElementById(`win-disp-${color}`);
+                    disp.innerHTML = `🏆<br>Winner #${winnersRanking.length}`; disp.style.display = 'flex';
+                }
+            } else if(target <= 50) { 
                 let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
+                let killed = false;
+                
                 for (const c of activeColors) {
                     if (c === color) continue; 
                     for (let i = 0; i < gameState[c].length; i++) {
@@ -313,9 +371,12 @@
                             if (myGlobalIdx === enemyIdx && !starPositions.some(s => s[0]===mainPath[myGlobalIdx][0] && s[1]===mainPath[myGlobalIdx][1])) {
                                 extraTurn = true; playSound('kill');
                                 for(let k = enemyPos; k >= -1; k--) { gameState[c][i] = k; render(); await new Promise(r => setTimeout(r, 30)); }
+                                killed = true;
+                                break; // REAL LUDO RULE: KILL ONLY ONE TOKEN
                             }
                         }
                     }
+                    if(killed) break; // IF KILLED ONCE, STOP CHECKING OTHERS
                 }
             }
 
@@ -330,6 +391,15 @@
         function updateTurnStatus() {
             if(activeColors.length < 1) return;
             let color = activeColors[turnIdx];
+            
+            // Skip player if they have won
+            if(winnersRanking.includes(color)) {
+                if(color === myColor) {
+                    socket.emit('passTurn', {roomId: myRoomId});
+                }
+                return;
+            }
+
             let statusEl = document.getElementById('turnStatus');
             if (color === myColor) statusEl.innerHTML = `YOUR TURN! 🎲`; else statusEl.innerHTML = `${color.toUpperCase()}'s Turn`;
             
@@ -337,7 +407,6 @@
             document.querySelectorAll('.dice-box').forEach(d => d.classList.remove('active-dice-box'));
             if(document.getElementById(`dice-${color}`)) document.getElementById(`dice-${color}`).classList.add('active-dice-box');
             
-            // Final guarantee lock resets on turn change
             hasRolled = false;
             isRequestingRoll = false;
         }
