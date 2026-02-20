@@ -7,57 +7,80 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
-            --bg-color: #0f0c29; --room-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            --bg-color: #0f0c29; 
+            --room-gradient: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             --text-color: #fff; --board-bg: #fff; --border-color: #bbb;
             --red: #ff3b3b; --green: #00b84c; --yellow: #ffcc00; --blue: #0084ff;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent;}
         
         body { background: var(--room-gradient); color: var(--text-color); display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100vh; width: 100vw; overflow: hidden; overscroll-behavior: none; }
+        #fireworks { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
         
-        /* Lobby UI */
+        /* LOBBY UI */
         #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
-        .lobby-box { background: #24243e; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(0,255,255,0.2); }
-        input { padding: 10px; font-size: 18px; border-radius: 5px; border: none; text-align: center; outline: none; margin-bottom: 10px; width: 100%;}
-        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; font-size: 16px; width: 100%;}
+        .lobby-box { background: #24243e; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(0,255,255,0.2); width: 90%; max-width: 400px;}
+        input { padding: 12px; font-size: 18px; border-radius: 8px; border: none; text-align: center; outline: none; margin-bottom: 15px; width: 100%; font-weight: bold; }
+        button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; font-size: 18px; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;}
+        button:active { transform: scale(0.95); }
+        .btn-green { background: var(--green); margin-top: 10px; display: none; }
+        .btn-red { background: var(--red); margin-top: 5px; display: none; }
         
-        header { width: 100%; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); flex-shrink: 0; }
+        header { width: 100%; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); flex-shrink: 0; z-index: 10;}
         
-        /* ✨ MAGIC: The Game Wrapper Rotates Based on Your Color ✨ */
+        .main-container { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+
         .game-wrapper { 
-            flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 5px; 
+            position: relative; display: flex; justify-content: center; align-items: center; 
+            padding: 8px; background: rgba(0,0,0,0.2); border-radius: 15px; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.5); 
             transform: rotate(var(--board-rot, 0deg)); 
-            transition: transform 1s ease-in-out;
+            transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .dice-row { display: flex; justify-content: space-between; width: 100%; max-width: min(95vw, 55vh); padding: 0 5px; margin: 5px 0; z-index: 100; }
-        .dice-slot { width: 55px; height: 55px; }
+        .ludo-board {
+            display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+            width: 90vmin; max-width: 500px; height: 90vmin; max-height: 500px;
+            background-color: var(--board-bg); border: 3px solid #333; position: relative; border-radius: 5px;
+        }
 
-        .dice-neon-container { width: 100%; height: 100%; background: rgba(255, 255, 255, 0.05); border-radius: 12px; display: flex; justify-content: center; align-items: center; }
-        #box-red { box-shadow: 0 0 15px var(--red); } #box-green { box-shadow: 0 0 15px var(--green); } #box-yellow { box-shadow: 0 0 15px var(--yellow); } #box-blue { box-shadow: 0 0 15px var(--blue); }
+        .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
+        .cell.has-many { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; }
+        .star { display: inline-block; font-size: 14px; transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 1s; }
 
-        .dice-box { width: 45px; height: 45px; background: #fff; border: 2px solid #444; border-radius: 8px; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 5px; cursor: pointer; }
-        .dot { background-color: #333; border-radius: 50%; width: 100%; height: 100%; visibility: hidden; }
-
-        /* Counter rotate text and dice so they don't look upside down */
-        .dice-box, .winner-display { transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 1s; }
+        .base { position: absolute; width: 40%; height: 40%; border: 2px solid white; display: flex; justify-content: center; align-items: center; flex-direction: column;}
+        .base-red { top: 0; left: 0; background: var(--red); } .base-green { top: 0; right: 0; background: var(--green); } .base-yellow { bottom: 0; right: 0; background: var(--yellow); } .base-blue { bottom: 0; left: 0; background: var(--blue); }
         
-        .active-dice-box { outline: 3px solid #fff; transform: scale(1.1) rotate(calc(var(--board-rot, 0deg) * -1)); }
+        .winner-display { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); color: #fff; display: none; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; text-align: center; z-index: 50; transform: rotate(calc(var(--board-rot, 0deg) * -1)); }
+
+        .base-inner { background: white; border-radius: 15px; width: 65%; height: 65%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15%; padding: 15%; box-shadow: inset 0 5px 15px rgba(0,0,0,0.3); }
+        .base-spot { width: 100%; height: 100%; border-radius: 50%; background: #eaeaea; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 0 3px 6px rgba(0,0,0,0.2);}
+
+        /* DICE INSIDE THE BASE SO IT NEVER OVERFLOWS */
+        .dice-neon-container {
+            position: absolute; width: 50px; height: 50px; 
+            background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px; display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px); z-index: 100;
+        }
+        /* Corners facing outward */
+        #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); }
+        #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); }
+        #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); }
+        #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
+
+        .dice-box {
+            width: 40px; height: 40px; background: #fff;
+            border: 2px solid #444; border-radius: 6px; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+            padding: 4px; cursor: pointer;
+            transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 0.3s;
+        }
+        .dot { background-color: #333; border-radius: 50%; width: 100%; height: 100%; visibility: hidden; }
+        .active-dice-box { transform: scale(1.2) rotate(calc(var(--board-rot, 0deg) * -1)); outline: 3px solid #fff; }
         .rolling { animation: roll 0.2s infinite linear; }
         @keyframes roll { 0% { transform: scale(1.1) rotate(0deg); } 100% { transform: scale(1.1) rotate(360deg); } }
 
-        .ludo-board { display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr); width: 100%; height: 100%; max-width: min(95vw, 55vh); max-height: min(95vw, 55vh); aspect-ratio: 1; background-color: var(--board-bg); border: 3px solid #333; border-radius: 5px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
-        .cell.has-many { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; }
-
-        .base { position: absolute; width: 40%; height: 40%; border: 2px solid white; display: flex; justify-content: center; align-items: center; flex-direction: column; overflow: hidden;}
-        .base-red { top: 0; left: 0; background: var(--red); } .base-green { top: 0; right: 0; background: var(--green); } .base-yellow { bottom: 0; right: 0; background: var(--yellow); } .base-blue { bottom: 0; left: 0; background: var(--blue); }
-        
-        .winner-display { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); color: #fff; display: none; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; z-index: 50; }
-        .base-inner { background: white; border-radius: 15px; width: 70%; height: 70%; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15%; padding: 15%; }
-        .base-spot { width: 100%; height: 100%; border-radius: 50%; background: #eaeaea; display: flex; justify-content: center; align-items: center; }
-
-        .token { width: 80%; height: 80%; border-radius: 50%; position: relative; box-shadow: 0 3px 6px rgba(0,0,0,0.5); cursor: pointer; z-index: 20; border: 2px solid rgba(255,255,255,0.3); }
+        .token { width: 80%; height: 80%; border-radius: 50%; position: relative; box-shadow: 0 5px 10px rgba(0,0,0,0.5); cursor: pointer; z-index: 20; border: 2px solid rgba(255,255,255,0.3); }
         .token::after { content: ''; position: absolute; top: 15%; left: 15%; width: 50%; height: 50%; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); }
         .token.red { background: radial-gradient(circle at 35% 35%, #ff8a8a, var(--red)); } .token.green { background: radial-gradient(circle at 35% 35%, #5aff96, var(--green)); } .token.yellow { background: radial-gradient(circle at 35% 35%, #ffe680, var(--yellow)); } .token.blue { background: radial-gradient(circle at 35% 35%, #8acfff, var(--blue)); }
         .token.highlight { box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.9); border: 2px solid #000; animation: bounce 0.6s infinite alternate; }
@@ -70,64 +93,58 @@
         .tri { position: absolute; width: 100%; height: 100%; overflow: hidden; }
         .tri-top { background: var(--green); clip-path: polygon(0 0, 100% 0, 50% 50%); } .tri-right { background: var(--yellow); clip-path: polygon(100% 0, 100% 100%, 50% 50%); } .tri-bottom { background: var(--blue); clip-path: polygon(0 100%, 100% 100%, 50% 50%); } .tri-left { background: var(--red); clip-path: polygon(0 0, 0 100%, 50% 50%); }
 
-        .status-container { flex-shrink: 0; padding: 10px; margin-bottom: 15px; text-align: center; width: 100%;}
-        .status-text { font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 8px 25px; border-radius: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); }
-        #myColorDisp { font-size: 14px; margin-top: 5px; color: #aaa; }
+        .status-container { padding: 15px; text-align: center; width: 100%; z-index: 10; }
+        .status-text { font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 8px 25px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; }
+        #myColorDisp { font-size: 14px; margin-top: 8px; color: #ddd; }
     </style>
 </head>
-<body>
+<body onclick="initAudio()">
+    <canvas id="fireworks"></canvas>
 
     <div id="lobby">
         <div class="lobby-box">
-            <h1 style="color:var(--yellow); margin-bottom: 20px;">Ludo Online 🌐</h1>
-            <input type="text" id="roomIdInput" placeholder="Enter Room Code (e.g. 1234)">
+            <h1 style="color:var(--yellow); margin-bottom: 10px;">Ludo Multiplayer</h1>
+            <input type="text" id="roomIdInput" placeholder="Enter Room Code">
             <button onclick="joinRoom()">Join Game</button>
-            <p style="margin-top: 15px; font-size: 12px; color: #aaa;">Share the code with friends to play together.</p>
+            <div id="lobbyStatus" style="margin-top: 15px; color:#aaa; font-weight:bold;"></div>
+            <button id="startBtn" class="btn-green" onclick="startGame()">▶ Start Game</button>
         </div>
     </div>
 
     <header>
-        <h2>Ludo Online</h2>
-        <div id="roomCodeDisplay">Room: ---</div>
+        <h2>Ludo Pro</h2>
+        <div style="display:flex; gap: 10px;">
+            <div id="roomCodeDisplay" style="font-weight: bold; color: var(--yellow); align-self:center;">Room: ---</div>
+            <button id="restartBtn" class="btn-red" style="padding: 5px 10px; font-size: 12px; width:auto;" onclick="restartGame()">Restart</button>
+        </div>
     </header>
 
-    <div class="game-wrapper" id="gameWrapper">
-        <div class="dice-row">
-            <div class="dice-slot"><div class="dice-neon-container" id="box-red"><div class="dice-box" id="dice-red" onclick="requestDiceRoll('red')"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
-            <div class="dice-slot"><div class="dice-neon-container" id="box-green"><div class="dice-box" id="dice-green" onclick="requestDiceRoll('green')"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
-        </div>
-
-        <div class="ludo-board" id="board">
-            <div class="center-home">
-                <div class="tri tri-top" id="home-green"><div class="tri-tokens"></div></div>
-                <div class="tri tri-right" id="home-yellow"><div class="tri-tokens"></div></div>
-                <div class="tri tri-bottom" id="home-blue"><div class="tri-tokens"></div></div>
-                <div class="tri tri-left" id="home-red"><div class="tri-tokens"></div></div>
+    <div class="main-container">
+        <div class="game-wrapper" id="gameWrapper">
+            <div class="ludo-board" id="board">
+                <div class="center-home">
+                    <div class="tri tri-top" id="home-green"><div class="tri-tokens"></div></div>
+                    <div class="tri tri-right" id="home-yellow"><div class="tri-tokens"></div></div>
+                    <div class="tri tri-bottom" id="home-blue"><div class="tri-tokens"></div></div>
+                    <div class="tri tri-left" id="home-red"><div class="tri-tokens"></div></div>
+                </div>
             </div>
-        </div>
-
-        <div class="dice-row">
-            <div class="dice-slot"><div class="dice-neon-container" id="box-blue"><div class="dice-box" id="dice-blue" onclick="requestDiceRoll('blue')"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
-            <div class="dice-slot"><div class="dice-neon-container" id="box-yellow"><div class="dice-box" id="dice-yellow" onclick="requestDiceRoll('yellow')"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
         </div>
     </div>
 
     <div class="status-container">
-        <div class="status-text" id="turnStatus">Waiting for players...</div>
+        <div class="status-text" id="turnStatus">Game not started...</div>
         <div id="myColorDisp"></div>
     </div>
 
     <script>
-        const socket = io(); // Connect to backend
-        let myRoomId = "";
-        let myColor = "";
+        const socket = io(); 
+        let myRoomId = "", myColor = "", isHost = false;
         
-        // Perspective Rotation Math
-        // Blue is default bottom-left (0deg). 
-        // If I am Red (Top-Left), I need to rotate board -90deg to bring Red to bottom-left.
-        const colorRotations = { 'blue': '0deg', 'red': '-90deg', 'green': '180deg', 'yellow': '90deg' };
-
+        // Perspective Map
+        const colorRotations = { 'blue': '0deg', 'green': '180deg', 'red': '-90deg', 'yellow': '90deg' };
         const dicePatterns = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
+        const starPositions = [[7,2], [3,7], [2,9], [7,13], [9,14], [13,9], [14,7], [9,3]]; 
         const mainPath = [[7,2],[7,3],[7,4],[7,5],[7,6], [6,7],[5,7],[4,7],[3,7],[2,7],[1,7], [1,8],[1,9],[2,9],[3,9],[4,9],[5,9],[6,9], [7,10],[7,11],[7,12],[7,13],[7,14],[7,15], [8,15],[9,15],[9,14],[9,13],[9,12],[9,11],[9,10], [10,9],[11,9],[12,9],[13,9],[14,9],[15,9], [15,8],[15,7],[14,7],[13,7],[12,7],[11,7],[10,7], [9,6],[9,5],[9,4],[9,3],[9,2],[9,1], [8,1],[7,1]];
         const homePaths = { red:[[8,2],[8,3],[8,4],[8,5],[8,6],[8,7]], green:[[2,8],[3,8],[4,8],[5,8],[6,8],[7,8]], yellow:[[8,14],[8,13],[8,12],[8,11],[8,10],[8,9]], blue:[[14,8],[13,8],[12,8],[11,8],[10,8],[9,8]] };
         
@@ -136,7 +153,7 @@
         let turnIdx = 0, currentRoll = 0, hasRolled = false, isAnimating = false;
         let cells = {};
 
-        function initBoard() {
+        function initEmptyBoard() {
             const board = document.getElementById('board');
             for(let r=1; r<=15; r++) {
                 for(let c=1; c<=15; c++) {
@@ -146,30 +163,45 @@
                     if (c==8 && r>1 && r<7) cell.style.backgroundColor = 'rgba(0, 184, 76, 0.2)'; 
                     if (r==8 && c>9 && c<15) cell.style.backgroundColor = 'rgba(255, 204, 0, 0.2)'; 
                     if (c==8 && r>9 && r<15) cell.style.backgroundColor = 'rgba(0, 132, 255, 0.2)'; 
+                    if(starPositions.some(p => p[0]==r && p[1]==c)) cell.innerHTML = '<span class="star">⭐</span>';
                     board.appendChild(cell); cells[`${r}_${c}`] = cell;
                 }
             }
-            initBases();
         }
 
-        function initBases() {
+        // Dynamically build ONLY the active players' bases and dice
+        function buildActiveBases() {
+            document.querySelectorAll('.base').forEach(e => e.remove());
             ['red','green','yellow','blue'].forEach(color => {
                 let base = document.createElement('div'); base.className = `base base-${color}`; base.id = `base-${color}`;
                 let winDisp = document.createElement('div'); winDisp.className = 'winner-display'; winDisp.id = `win-disp-${color}`; base.appendChild(winDisp);
                 let inner = document.createElement('div'); inner.className = 'base-inner';
                 
-                for(let i=0; i<4; i++) {
-                    let spot = document.createElement('div'); spot.className = 'base-spot'; spot.id = `spot_${color}_${i}`;
-                    let t = document.createElement('div'); t.className = `token ${color}`; t.id = `t_${color}_${i}`;
-                    t.onclick = () => requestTokenMove(color, i); 
-                    spot.appendChild(t); inner.appendChild(spot);
+                // Only spawn tokens and dice if player exists in activeColors
+                if (activeColors.includes(color)) {
+                    for(let i=0; i<4; i++) {
+                        let spot = document.createElement('div'); spot.className = 'base-spot'; spot.id = `spot_${color}_${i}`;
+                        let t = document.createElement('div'); t.className = `token ${color}`; t.id = `t_${color}_${i}`;
+                        t.onclick = () => requestTokenMove(color, i); 
+                        spot.appendChild(t); inner.appendChild(spot);
+                    }
+                    
+                    // Dice Container injected INSIDE the base. Fixed the ID and layout issues.
+                    let diceHTML = `<div class="dice-neon-container" id="box-${color}" style="display:flex;">
+                                        <div class="dice-box" id="dice-${color}" onclick="requestDiceRoll('${color}')">
+                                            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                                            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                                            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                                        </div>
+                                    </div>`;
+                    base.insertAdjacentHTML('beforeend', diceHTML);
                 }
                 base.appendChild(inner); document.getElementById('board').appendChild(base);
-                drawDice(color, 1);
+                if (activeColors.includes(color)) drawDice(color, 1);
             });
         }
 
-        // --- MULTIPLAYER LOGIC ---
+        // --- MULTIPLAYER LOBBY LOGIC ---
         function joinRoom() {
             const input = document.getElementById('roomIdInput').value;
             if(!input) return alert("Enter Room Code!");
@@ -179,32 +211,60 @@
 
         socket.on('joined', (data) => {
             myColor = data.color;
-            document.getElementById('lobby').style.display = 'none';
+            isHost = data.isHost;
             document.getElementById('roomCodeDisplay').innerText = `Room: ${data.roomId}`;
             document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myColor.toUpperCase()}</b>`;
-            
-            // MAGIC: Rotate the entire board so myColor is at bottom!
             document.getElementById('gameWrapper').style.setProperty('--board-rot', colorRotations[myColor]);
         });
 
-        socket.on('updatePlayers', (playersInRoom) => {
-            activeColors = playersInRoom;
-            document.querySelectorAll('.dice-neon-container').forEach(d => d.style.display = 'none');
-            activeColors.forEach(c => document.getElementById(`box-${c}`).style.display = 'flex');
-            updateTurnStatus();
+        socket.on('updatePlayers', (players) => {
+            let lobbyText = "Players Joined:<br>";
+            players.forEach((p, i) => { lobbyText += `${i+1}. ${p.toUpperCase()} <br>`; });
+            
+            if (isHost) {
+                lobbyText += "<br>You are the Host!";
+                document.getElementById('startBtn').style.display = 'block';
+            } else {
+                lobbyText += "<br>Waiting for Host to start...";
+            }
+            document.getElementById('lobbyStatus').innerHTML = lobbyText;
         });
 
+        function startGame() { socket.emit('startGame', myRoomId); }
+        function restartGame() { if(confirm("Restart game for everyone?")) socket.emit('restartGame', myRoomId); }
+
+        socket.on('gameStarted', (colors) => {
+            document.getElementById('lobby').style.display = 'none';
+            if(isHost) document.getElementById('restartBtn').style.display = 'block';
+            activeColors = colors;
+            gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
+            buildActiveBases();
+            turnIdx = 0; updateTurnStatus();
+        });
+
+        socket.on('gameRestarted', (colors) => {
+            activeColors = colors;
+            gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
+            document.querySelectorAll('.winner-display').forEach(w => w.style.display = 'none');
+            turnIdx = 0; updateTurnStatus(); render();
+        });
+
+        socket.on('errorMsg', (msg) => alert(msg));
+
+        // --- GAMEPLAY LOGIC ---
         function requestDiceRoll(color) {
             if (activeColors[turnIdx] !== color || myColor !== color || isAnimating || hasRolled) return; 
             socket.emit('rollDice', { roomId: myRoomId, color: color });
         }
 
         socket.on('diceRolled', (data) => {
-            isAnimating = true; 
-            const d = document.getElementById(`dice-${data.color}`); d.classList.add('rolling');
+            isAnimating = true; playSound('dice');
+            const d = document.getElementById(`dice-${data.color}`); 
+            if(d) d.classList.add('rolling');
             setTimeout(() => {
                 currentRoll = data.roll;
-                d.classList.remove('rolling'); drawDice(data.color, currentRoll);
+                if(d) d.classList.remove('rolling'); 
+                drawDice(data.color, currentRoll);
                 isAnimating = false; hasRolled = true; checkMovesLocally(data.color);
             }, 500);
         });
@@ -223,7 +283,6 @@
 
         function requestTokenMove(color, idx) {
             if (activeColors[turnIdx] !== color || myColor !== color || !hasRolled || isAnimating) return;
-            // Validate move locally
             let pos = gameState[color][idx];
             if(pos === -1 && currentRoll !== 6) return;
             if(pos !== -1 && pos + currentRoll > 56) return;
@@ -233,18 +292,16 @@
         }
 
         socket.on('tokenMoved', async (data) => {
-            isAnimating = true;
-            let color = data.color; let idx = data.idx;
-            let currentPos = gameState[color][idx];
-            let target = (currentPos===-1) ? 0 : currentPos+currentRoll;
+            isAnimating = true; let color = data.color; let idx = data.idx;
+            let currentPos = gameState[color][idx]; let target = (currentPos===-1) ? 0 : currentPos+currentRoll;
             
-            if(currentPos === -1) { gameState[color][idx] = 0; render(); await new Promise(r => setTimeout(r, 200)); } 
-            else { for(let p=currentPos+1; p<=target; p++) { gameState[color][idx] = p; render(); await new Promise(r => setTimeout(r, 150)); } }
+            if(currentPos === -1) { gameState[color][idx] = 0; playSound('move'); render(); await new Promise(r => setTimeout(r, 200)); } 
+            else { for(let p=currentPos+1; p<=target; p++) { gameState[color][idx] = p; playSound('move'); render(); await new Promise(r => setTimeout(r, 150)); } }
             
             let extraTurn = (currentRoll === 6);
-            
-            // Check Kill logic locally (all clients sync up because rules are identical)
-            if(target < 51) {
+            if(target === 56) {
+                extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
+            } else if(target < 51) {
                 let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
                 for (const c of activeColors) {
                     if (c === color) continue; 
@@ -252,8 +309,8 @@
                         let enemyPos = gameState[c][i];
                         if(enemyPos !== -1 && enemyPos < 51) {
                             let enemyIdx = (enemyPos + {red:0, green:13, yellow:26, blue:39}[c])%52;
-                            if (myGlobalIdx === enemyIdx) {
-                                extraTurn = true; 
+                            if (myGlobalIdx === enemyIdx && !starPositions.some(s => s[0]===mainPath[myGlobalIdx][0] && s[1]===mainPath[myGlobalIdx][1])) {
+                                extraTurn = true; playSound('kill');
                                 for(let k = enemyPos; k >= -1; k--) { gameState[c][i] = k; render(); await new Promise(r => setTimeout(r, 30)); }
                             }
                         }
@@ -262,43 +319,38 @@
             }
 
             isAnimating = false;
-            // Only the active player tells the server to change turn (to avoid multiple calls)
             if (color === myColor) {
-                if(extraTurn) updateTurnStatus(); // Local update, keep turn
-                else socket.emit('passTurn', {roomId: myRoomId});
+                if(extraTurn) updateTurnStatus(); else socket.emit('passTurn', {roomId: myRoomId});
             }
         });
 
-        socket.on('turnChanged', () => {
-            turnIdx = (turnIdx + 1) % activeColors.length;
-            updateTurnStatus();
-        });
+        socket.on('turnChanged', () => { turnIdx = (turnIdx + 1) % activeColors.length; updateTurnStatus(); });
 
         function updateTurnStatus() {
             if(activeColors.length < 1) return;
             let color = activeColors[turnIdx];
             let statusEl = document.getElementById('turnStatus');
-            
-            if (color === myColor) statusEl.innerHTML = `YOUR TURN! 🎲`;
-            else statusEl.innerHTML = `${color.toUpperCase()}'s Turn`;
+            if (color === myColor) statusEl.innerHTML = `YOUR TURN! 🎲`; else statusEl.innerHTML = `${color.toUpperCase()}'s Turn`;
             
             statusEl.style.color = `var(--${color})`;
             document.querySelectorAll('.dice-box').forEach(d => d.classList.remove('active-dice-box'));
-            document.getElementById(`dice-${color}`).classList.add('active-dice-box');
+            if(document.getElementById(`dice-${color}`)) document.getElementById(`dice-${color}`).classList.add('active-dice-box');
             hasRolled = false;
         }
 
         function drawDice(color, num) {
             const dots = document.querySelectorAll(`#dice-${color} .dot`);
+            if(!dots.length) return;
             dots.forEach(d => d.style.visibility = 'hidden');
             dicePatterns[num].forEach(i => dots[i].style.visibility = 'visible');
         }
 
         function render() {
             Object.values(cells).forEach(c => c.classList.remove('has-many'));
-            ['red','green','yellow','blue'].forEach(color => {
+            activeColors.forEach(color => {
                 gameState[color].forEach((pos, i) => {
                     let t = document.getElementById(`t_${color}_${i}`);
+                    if(!t) return;
                     if(pos === -1) { document.getElementById(`spot_${color}_${i}`).appendChild(t); }
                     else if (pos === 56) { document.querySelector(`#home-${color} .tri-tokens`).appendChild(t); }
                     else {
@@ -311,7 +363,19 @@
             });
         }
 
-        initBoard();
+        let audioCtx;
+        function initAudio() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function playSound(type) {
+            if(!audioCtx || audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === 'dice') { osc.type = 'triangle'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1); gain.gain.setValueAtTime(0.5, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+            else if (type === 'move') { osc.type = 'sine'; osc.frequency.setValueAtTime(400, audioCtx.currentTime); gain.gain.setValueAtTime(0.4, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+            else if (type === 'kill') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.3); gain.gain.setValueAtTime(0.8, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3); osc.start(); osc.stop(audioCtx.currentTime + 0.3); }
+            else if (type === 'halal') { osc.type='sine'; osc.frequency.setValueAtTime(500, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime+0.5); gain.gain.setValueAtTime(0.3, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime+0.5); }
+        }
+
+        initEmptyBoard();
     </script>
 </body>
 </html>
