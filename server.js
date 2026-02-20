@@ -21,7 +21,7 @@ io.on('connection', (socket) => {
                 status: 'waiting',
                 colors: ['blue', 'green', 'red', 'yellow'],
                 activeColors: [],
-                rollStats: {} // For the "Forced 6" logic
+                rollStats: {} // Har 4-6 chal me 6 lane ke liye tracker
             };
         }
         
@@ -49,12 +49,9 @@ io.on('connection', (socket) => {
             room.activeColors = room.players.map(p => p.color);
             room.turnIdx = 0;
             
-            // Initialize roll stats for forced 6
+            // Stats setup
             room.activeColors.forEach(c => {
-                room.rollStats[c] = {
-                    count: 0,
-                    target: Math.floor(Math.random() * 3) + 4 // Random target between 4 and 6
-                };
+                room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 }; // Target: 4, 5, ya 6
             });
 
             io.to(roomId).emit('gameStarted', room.activeColors);
@@ -77,19 +74,19 @@ io.on('connection', (socket) => {
         if(!room) return;
 
         let stats = room.rollStats[data.color];
-        stats.count++; // Increase turn count for this player
+        stats.count++; // Player ki chaal gin rahe hain
 
         let roll = Math.floor(Math.random() * 6) + 1; // Normal random roll
 
-        // IF forced turn reached, give them a 6!
+        // Agar target hit ho gaya to forcefully 6 de do
         if (stats.count >= stats.target) {
             roll = 6;
         }
 
-        // If they get a 6 (naturally or forced), reset their counter
+        // Agar 6 aa gaya (kismat se ya force se), counter reset kardo
         if (roll === 6) {
             stats.count = 0;
-            stats.target = Math.floor(Math.random() * 3) + 4; // Set next target to 4, 5, or 6
+            stats.target = Math.floor(Math.random() * 3) + 4; // Naya target set karo
         }
 
         io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
