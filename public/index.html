@@ -58,8 +58,6 @@
         .ludo-board { display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr); width: 100%; height: 100%; background-color: var(--board-bg); border: 3px solid #333; position: relative; border-radius: 5px; }
 
         .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
-        
-        /* ✨ PERMANENT FIX FOR SCATTERING/TINY TOKENS ✨ */
         .cell.has-many { display: grid; grid-template-columns: 50% 50%; grid-template-rows: 50% 50%; justify-items: center; align-items: center; padding: 1px; gap: 0;}
         .cell.has-many .token { width: 85% !important; height: 85% !important; margin: 0; position: relative; }
 
@@ -91,7 +89,6 @@
         .token.highlight { box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.9); border: 2px solid #000; animation: bounce 0.6s infinite alternate; }
         @keyframes bounce { 0% { transform: scale(1); } 100% { transform: scale(1.15); } }
 
-        /* ✨ FIX: Center Win Zones (Tokens sit perfectly inside) ✨ */
         .center-home { grid-area: 7 / 7 / 10 / 10; position: relative; display: flex; justify-content: center; align-items: center;}
         .tri { position: absolute; width: 100%; height: 100%; overflow: hidden; z-index: 10;}
         .tri-top { background: var(--green); clip-path: polygon(0 0, 100% 0, 50% 50%); } .tri-right { background: var(--yellow); clip-path: polygon(100% 0, 100% 100%, 50% 50%); } .tri-bottom { background: var(--blue); clip-path: polygon(0 100%, 100% 100%, 50% 50%); } .tri-left { background: var(--red); clip-path: polygon(0 0, 0 100%, 50% 50%); }
@@ -101,7 +98,6 @@
         #win-zone-yellow { right: 8%; top: 32.5%; }
         #win-zone-blue { bottom: 8%; left: 32.5%; }
         #win-zone-red { left: 8%; top: 32.5%; }
-
         .win-zone .token { width: 40% !important; height: 40% !important; margin: 0; box-shadow: 0 0 6px gold !important; border: 1.5px solid white !important; }
 
         /* FOOTER */
@@ -195,6 +191,7 @@
         <div class="status-container">
             <div style="overflow: hidden; text-overflow: ellipsis; display:flex; flex-direction:column; align-items:flex-start; gap:5px;">
                 <div class="status-text" id="turnStatus">Game not started...</div>
+                <div id="restartContainer"></div> 
                 <div id="myColorDisp"></div>
             </div>
             
@@ -221,7 +218,7 @@
 
     <script>
         const socket = io(); 
-        let myRoomId = "", myColor = "", myName = "", isHost = false;
+        let myRoomId = "", myColor = "", myName = "", isHost = false, wasHost = false;
         let winnersRanking = [];
         let roomPlayersInfo = []; 
         let pendingJoinReqId = null;
@@ -240,14 +237,12 @@
         let currentRoll = 0, hasRolled = false, isAnimating = false, isRequestingRoll = false;
         let cells = {};
 
-        // --- SOUND ---
         function toggleSound() {
             soundEnabled = !soundEnabled;
             document.getElementById('soundBtn').innerText = soundEnabled ? "🔊" : "🔇";
             if(soundEnabled) playSound('move');
         }
 
-        // --- EMOJI / CHAT ---
         function toggleMenu(menuId) {
             document.getElementById('emojiMenu').style.display = 'none';
             document.getElementById('chatMenu').style.display = 'none';
@@ -269,7 +264,6 @@
             }
         });
 
-        // --- BANNER SYSTEM ---
         function showBanner(htmlContent, isLoser = false) {
             let banner = document.getElementById('winBanner');
             banner.innerHTML = htmlContent;
@@ -289,7 +283,6 @@
             setTimeout(() => em.remove(), 2500);
         }
 
-        // --- BOARD ---
         function initEmptyBoard() {
             const board = document.getElementById('board');
             for(let r=1; r<=15; r++) {
@@ -308,9 +301,9 @@
         }
 
         function buildActiveBases() {
-            // FIX: Purani gotiyan ekdum clean saaf hongi
             document.querySelectorAll('.token').forEach(t => t.remove());
             document.querySelectorAll('.base').forEach(e => e.remove());
+            document.getElementById('restartContainer').innerHTML = ""; 
 
             ['red','green','yellow','blue'].forEach(color => {
                 let base = document.createElement('div'); base.className = `base base-${color}`; base.id = `base-${color}`;
@@ -345,7 +338,6 @@
             return p ? p.name : col;
         }
 
-        // --- LOBBY LOGIC ---
         function joinRoom() {
             let inputName = document.getElementById('playerNameInput').value.trim();
             if(!inputName) inputName = "Player";
@@ -375,12 +367,64 @@
             document.getElementById('joinBtn').style.display = 'none';
             
             myColor = data.color; isHost = data.isHost; myName = data.name;
+            wasHost = isHost;
             document.getElementById('roomCodeDisplay').innerText = `Room: ${data.roomId}`;
             document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myName} (${myColor.toUpperCase()})</b>`;
             document.getElementById('gameWrapper').style.setProperty('--board-rot', colorRotations[myColor]);
         });
 
-        // ✨ FACE-OFF SYNC ✨
+        // ✨ HOST MIGRATION NOTIFICATION & SYNC ✨
+        socket.on('updatePlayers', (data) => {
+            roomPlayersInfo = data.players; 
+            isHost = (socket.id === data.hostId);
+
+            if (isHost && !wasHost) {
+                alert("The previous host left. YOU are now the Host!");
+                wasHost = true;
+            }
+
+            let lobbyText = "Players Joined:<br><br>";
+            let adminText = "";
+
+            data.players.forEach((p, i) => { 
+                lobbyText += `<div style="margin-bottom:5px;">${i+1}. ${p.name} (${p.color.toUpperCase()})</div>`;
+                
+                let status = p.online ? "🟢" : "🔴";
+                adminText += `<div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-weight:bold; font-size:14px;">${i+1}. ${p.name} ${status}</span>`;
+                if(isHost && p.id !== socket.id) {
+                    adminText += `<button class="kick-btn" onclick="kickPlayer('${p.id}')">KICK</button>`;
+                }
+                adminText += `</div>`;
+
+                let dot = document.getElementById(`status-${p.color}`);
+                if(dot) {
+                    if(p.online) dot.classList.remove('offline');
+                    else dot.classList.add('offline');
+                }
+            });
+            
+            document.getElementById('adminPlayerList').innerHTML = adminText;
+
+            if (isHost && data.players.length > 0) {
+                document.getElementById('adminBtn').style.display = 'block';
+                if(activeColors.length > 0) {
+                    document.getElementById('restartBtn').style.display = 'block';
+                    document.getElementById('startBtn').style.display = 'none';
+                } else {
+                    document.getElementById('startBtn').style.display = 'block';
+                    document.getElementById('restartBtn').style.display = 'none';
+                }
+            } else { 
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('adminBtn').style.display = 'none';
+                document.getElementById('restartBtn').style.display = 'none';
+                if(!isHost && activeColors.length === 0) lobbyText += "<br>Waiting for Host to start..."; 
+            }
+            document.getElementById('lobbyStatus').innerHTML = lobbyText;
+            updateTurnStatus();
+        });
+
         socket.on('migrateColor', (data) => {
             let oldC = data.oldColor;
             let newC = data.newColor;
@@ -407,43 +451,6 @@
                 document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myName} (${myColor.toUpperCase()})</b>`;
                 document.getElementById('gameWrapper').style.setProperty('--board-rot', colorRotations[myColor]);
             }
-        });
-
-        socket.on('updatePlayers', (players) => {
-            roomPlayersInfo = players; 
-            let lobbyText = "Players Joined:<br><br>";
-            let adminText = "";
-
-            players.forEach((p, i) => { 
-                lobbyText += `<div style="margin-bottom:5px;">${i+1}. ${p.name} (${p.color.toUpperCase()})</div>`;
-                
-                let status = p.online ? "🟢" : "🔴";
-                adminText += `<div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-weight:bold; font-size:14px;">${i+1}. ${p.name} ${status}</span>`;
-                if(isHost && p.id !== socket.id) {
-                    adminText += `<button class="kick-btn" onclick="kickPlayer('${p.id}')">KICK</button>`;
-                }
-                adminText += `</div>`;
-
-                let dot = document.getElementById(`status-${p.color}`);
-                if(dot) {
-                    if(p.online) dot.classList.remove('offline');
-                    else dot.classList.add('offline');
-                }
-            });
-            
-            document.getElementById('adminPlayerList').innerHTML = adminText;
-
-            if (isHost && players.length > 0) {
-                document.getElementById('startBtn').style.display = 'block';
-                document.getElementById('adminBtn').style.display = 'block';
-                document.getElementById('restartBtn').style.display = 'block'; // Permanent Restart for host
-            } else { 
-                document.getElementById('startBtn').style.display = 'none';
-                if(!isHost) lobbyText += "<br>Waiting for Host to start..."; 
-            }
-            document.getElementById('lobbyStatus').innerHTML = lobbyText;
-            updateTurnStatus();
         });
 
         socket.on('playerStatus', (data) => {
@@ -506,6 +513,8 @@
             document.getElementById('mainEmojiBtn').style.display = 'flex'; 
             document.getElementById('mainChatBtn').style.display = 'flex';
             
+            if(isHost) document.getElementById('restartBtn').style.display = 'block';
+            
             clearInterval(fireworksInterval); 
             activeColors = data.activeColors;
             currentTurnColor = data.turnColor;
@@ -531,13 +540,10 @@
             updateTurnStatus(); render();
         });
 
-        // --- GAMEPLAY LOGIC ---
         function requestDiceRoll(color) {
             if (currentTurnColor !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll || winnersRanking.includes(color)) return; 
-            
             isRequestingRoll = true; 
             socket.emit('rollDice', { roomId: myRoomId, color: color });
-
             setTimeout(() => { if (isRequestingRoll) isRequestingRoll = false; }, 2000);
         }
 
@@ -664,8 +670,13 @@
 
             if(winnersRanking.length >= activeColors.length - 1 && activeColors.length > 1) { 
                 let statusEl = document.getElementById('turnStatus');
+                
                 statusEl.innerHTML = "Game Over! 🏁";
                 statusEl.style.color = "white";
+
+                if(isHost) {
+                    document.getElementById('restartContainer').innerHTML = `<button class="btn-green" style="display:block; padding: 6px 15px; font-size: 14px;" onclick="restartGame()">↻ Restart Game</button>`;
+                }
 
                 if(!winnersRanking.includes(myColor)) {
                     showBanner(`😢 YOU LOST!<br>Better luck next time.`, true);
