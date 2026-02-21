@@ -14,7 +14,13 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent;}
         
-        body { background: var(--room-gradient); color: var(--text-color); display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100vh; width: 100vw; overflow: hidden; overscroll-behavior: none; }
+        /* ✨ MOBILE FIX: 100dvh prevents bottom bar hiding ✨ */
+        body { 
+            background: var(--room-gradient); color: var(--text-color); 
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between; 
+            height: 100vh; height: 100dvh; 
+            overflow: hidden; overscroll-behavior: none; 
+        }
         #fireworks { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 200; }
         
         /* LOBBY UI */
@@ -33,20 +39,23 @@
         .kick-btn { background: var(--red); padding: 4px 8px; font-size: 12px; border-radius: 4px; margin-left: 10px; cursor: pointer; display: inline-block; width: auto; font-weight: bold;}
 
         /* HEADER */
-        header { width: 100%; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); flex-shrink: 0; z-index: 10;}
-        .main-container { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+        header { width: 100%; padding: 10px 15px; padding-top: max(10px, env(safe-area-inset-top)); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); flex-shrink: 0; z-index: 10;}
+        .main-container { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; min-height: 0; }
 
+        /* ✨ MOBILE FIX: Dynamic Sizing so board never overlaps footer ✨ */
         .game-wrapper { 
             position: relative; display: flex; justify-content: center; align-items: center; 
             padding: 8px; background: rgba(0,0,0,0.2); border-radius: 15px; 
             box-shadow: 0 0 30px rgba(0,0,0,0.5); 
             transform: rotate(var(--board-rot, 0deg)); 
             transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+            width: min(94vw, 55dvh); /* Automatically fits smallest available space */
+            height: min(94vw, 55dvh);
         }
 
         .ludo-board {
             display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
-            width: 90vmin; max-width: 500px; height: 90vmin; max-height: 500px;
+            width: 100%; height: 100%;
             background-color: var(--board-bg); border: 3px solid #333; position: relative; border-radius: 5px;
         }
 
@@ -63,17 +72,17 @@
         .base-spot { width: 100%; height: 100%; border-radius: 50%; background: #eaeaea; display: flex; justify-content: center; align-items: center; position: relative; box-shadow: inset 0 3px 6px rgba(0,0,0,0.2);}
 
         .dice-neon-container {
-            position: absolute; width: 45px; height: 45px; 
+            position: absolute; width: 42px; height: 42px; 
             background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255, 255, 255, 0.5);
             border-radius: 10px; display: none; justify-content: center; align-items: center;
             backdrop-filter: blur(5px); z-index: 100;
         }
         #box-red { top: 5px; left: 5px; box-shadow: 0 0 10px var(--red); } #box-green { top: 5px; right: 5px; box-shadow: 0 0 10px var(--green); } #box-yellow { bottom: 5px; right: 5px; box-shadow: 0 0 10px var(--yellow); } #box-blue { bottom: 5px; left: 5px; box-shadow: 0 0 10px var(--blue); }
 
-        .online-dot { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); z-index: 110; }
+        .online-dot { position: absolute; top: -6px; right: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--green); border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5); z-index: 110; }
         .online-dot.offline { background: var(--red); }
 
-        .dice-box { width: 35px; height: 35px; background: #fff; border: 2px solid #444; border-radius: 6px; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 3px; cursor: pointer; transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 0.3s; }
+        .dice-box { width: 32px; height: 32px; background: #fff; border: 2px solid #444; border-radius: 6px; display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 3px; cursor: pointer; transform: rotate(calc(var(--board-rot, 0deg) * -1)); transition: 0.3s; }
         .dot { background-color: #333; border-radius: 50%; width: 100%; height: 100%; visibility: hidden; }
         .active-dice-box { transform: scale(1.2) rotate(calc(var(--board-rot, 0deg) * -1)); outline: 3px solid #fff; }
         .rolling { animation: roll 0.2s infinite linear; }
@@ -92,18 +101,25 @@
         .tri { position: absolute; width: 100%; height: 100%; overflow: hidden; }
         .tri-top { background: var(--green); clip-path: polygon(0 0, 100% 0, 50% 50%); } .tri-right { background: var(--yellow); clip-path: polygon(100% 0, 100% 100%, 50% 50%); } .tri-bottom { background: var(--blue); clip-path: polygon(0 100%, 100% 100%, 50% 50%); } .tri-left { background: var(--red); clip-path: polygon(0 0, 0 100%, 50% 50%); }
 
-        /* FOOTER & CHAT */
-        .footer { padding: 10px 15px; width: 100%; z-index: 10; position: relative; }
+        /* ✨ MOBILE FIX: Footer will NEVER hide now ✨ */
+        .footer { 
+            padding: 10px 15px; 
+            padding-bottom: max(15px, env(safe-area-inset-bottom)); /* Safes space for phone gesture bar */
+            width: 100%; z-index: 10; 
+            flex-shrink: 0; /* Prevents squishing */
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
         .status-container { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .status-text { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; }
-        #myColorDisp { font-size: 12px; margin-top: 4px; color: #ddd; text-align: left;}
+        .status-text { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; white-space: nowrap; }
+        #myColorDisp { font-size: 12px; margin-top: 4px; color: #ddd; text-align: left; padding-left: 5px;}
 
         /* EMOJI & CHAT SYSTEM */
         .btn-interact { background: #24243e; border: 2px solid var(--blue); color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 18px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;}
         .btn-interact:active { transform: scale(0.9); }
         
-        .interaction-menu { display: none; position: absolute; bottom: 60px; right: 15px; background: rgba(0,0,0,0.85); border-radius: 10px; padding: 10px; gap: 10px; flex-direction: row; border: 1px solid #555; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
-        .chat-menu { flex-direction: column; width: max-content; right: 65px; }
+        .interaction-menu { display: none; position: absolute; bottom: 60px; right: 0; background: rgba(0,0,0,0.85); border-radius: 10px; padding: 10px; gap: 10px; flex-direction: row; border: 1px solid #555; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
+        .chat-menu { flex-direction: column; width: max-content; right: 50px; }
         .interact-item { font-size: 24px; cursor: pointer; transition: transform 0.2s; }
         .interact-item:active { transform: scale(1.3); }
         .chat-item { font-size: 14px; font-weight: bold; padding: 8px 12px; background: rgba(255,255,255,0.1); border-radius: 6px; color: white; }
@@ -123,7 +139,6 @@
             85% { opacity: 1; transform: scale(1) rotate(calc(var(--board-rot, 0deg) * -1)); }
             100% { opacity: 0; margin-top: -60px; transform: scale(1) rotate(calc(var(--board-rot, 0deg) * -1)); }
         }
-
     </style>
 </head>
 <body onclick="initAudio()">
@@ -161,7 +176,7 @@
 
     <header>
         <div style="display:flex; align-items:center; gap:10px;">
-            <h2>Ludo Pro</h2>
+            <h2 style="font-size: 20px;">Ludo Pro</h2>
             <button id="soundBtn" style="background:transparent; font-size:20px; padding:0; width:auto; box-shadow:none;" onclick="toggleSound()">🔊</button>
         </div>
         <div style="display:flex; gap: 6px; align-items: center;">
@@ -186,7 +201,7 @@
 
     <div class="footer">
         <div class="status-container">
-            <div>
+            <div style="overflow: hidden; text-overflow: ellipsis;">
                 <div class="status-text" id="turnStatus">Game not started...</div>
                 <div id="myColorDisp"></div>
             </div>
@@ -472,19 +487,15 @@
             updateTurnStatus(); render();
         });
 
-        // --- GAMEPLAY LOGIC (ANTI-FREEZE SYSTEM) ---
+        // --- GAMEPLAY LOGIC ---
         function requestDiceRoll(color) {
             if (currentTurnColor !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll || winnersRanking.includes(color)) return; 
             
             isRequestingRoll = true; 
             socket.emit('rollDice', { roomId: myRoomId, color: color });
 
-            // SAFETY UNLOCK: Agar server 2 second tak respond na kare, toh dice automatically unlock ho jayega
             setTimeout(() => {
-                if (isRequestingRoll) {
-                    isRequestingRoll = false;
-                    console.log("Anti-Freeze: Dice auto-unlocked.");
-                }
+                if (isRequestingRoll) isRequestingRoll = false;
             }, 2000);
         }
 
@@ -537,7 +548,6 @@
             let extraTurn = false;
             let color = data.color; 
             
-            // SAFETY WRAPPER: Try...Finally guarantees 'isAnimating' will never freeze the game
             try {
                 let idx = data.idx;
                 let currentPos = gameState[color][idx]; let target = (currentPos===-1) ? 0 : currentPos+currentRoll;
@@ -575,7 +585,7 @@
                     }
                 }
             } catch (error) {
-                console.error("Animation Error:", error);
+                console.error(error);
             } finally {
                 isAnimating = false;
                 if (color === myColor) {
@@ -593,10 +603,7 @@
         function updateTurnStatus() {
             if(activeColors.length === 0) return;
             
-            // FORCE UNLOCK: Clear all locks whenever a turn changes to prevent freezing
-            isAnimating = false;
-            hasRolled = false;
-            isRequestingRoll = false;
+            isAnimating = false; hasRolled = false; isRequestingRoll = false;
 
             if(winnersRanking.length >= activeColors.length - 1 && activeColors.length > 1) { 
                 let statusEl = document.getElementById('turnStatus');
@@ -618,7 +625,7 @@
             if (color === myColor) {
                 statusEl.innerHTML = `🎲 YOUR TURN (${myName.toUpperCase()})!`;
             } else {
-                statusEl.innerHTML = `⏳ ${pName.toUpperCase()}'s Turn (${color.toUpperCase()})`;
+                statusEl.innerHTML = `⏳ ${pName.toUpperCase()}'s Turn`;
             }
             
             statusEl.style.color = `var(--${color})`;
