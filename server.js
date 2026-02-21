@@ -13,6 +13,14 @@ const rooms = {};
 const assignmentOrder = ['blue', 'green', 'red', 'yellow'];
 const turnOrder = ['blue', 'red', 'green', 'yellow'];
 
+function getOppositeColor(c) {
+    if(c === 'blue') return 'green';
+    if(c === 'green') return 'blue';
+    if(c === 'red') return 'yellow';
+    if(c === 'yellow') return 'red';
+    return 'green';
+}
+
 io.on('connection', (socket) => {
 
     socket.on('joinRoom', (data) => {
@@ -24,8 +32,7 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) {
             rooms[roomId] = { 
                 players: [], host: socket.id, status: 'waiting',
-                activeColors: [], rollStats: {}, turnColor: '',
-                pendingRequests: {} // NEW: To store mid-game joiner names
+                activeColors: [], rollStats: {}, turnColor: '', pendingRequests: {} 
             };
         }
         
@@ -43,7 +50,6 @@ io.on('connection', (socket) => {
 
         if (room.status === 'playing') {
             socket.emit('waitingForHostApproval');
-            // FIX: Store name temporarily on server so it doesn't become 'undefined'
             room.pendingRequests[socket.id] = playerName;
             io.to(room.host).emit('joinRequest', { requesterId: socket.id, requesterName: playerName });
             return;
@@ -67,12 +73,10 @@ io.on('connection', (socket) => {
         if (data.accepted && room.players.length < 4) {
             let availableColors = assignmentOrder.filter(c => !room.players.some(p => p.color === c));
             let assignedColor = availableColors[0];
-            
-            // FIX: Retrieve the saved name
             let reqName = room.pendingRequests[data.requesterId] || 'Player';
             
             room.players.push({ id: data.requesterId, color: assignedColor, online: true, name: reqName });
-            delete room.pendingRequests[data.requesterId]; // Clean up memory
+            delete room.pendingRequests[data.requesterId];
             
             room.activeColors = room.players.map(p => p.color);
             room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
@@ -110,6 +114,29 @@ io.on('connection', (socket) => {
                 }
 
                 room.players.splice(pIndex, 1);
+                
+                // ✨ MAGIC FEATURE: Face-to-Face Role Switch ✨
+                if (room.players.length === 2 && room.status === 'playing') {
+                    let hostP = room.players.find(p => p.id === room.host);
+                    let oppP = room.players.find(p => p.id !== room.host);
+                    
+                    if (hostP && oppP) {
+                        let targetOppositeColor = getOppositeColor(hostP.color);
+                        if (oppP.color !== targetOppositeColor) {
+                            let oldColor = oppP.color;
+                            oppP.color = targetOppositeColor;
+                            
+                            // Swap stat tracker
+                            room.rollStats[targetOppositeColor] = room.rollStats[oldColor];
+                            delete room.rollStats[oldColor];
+                            
+                            if(room.turnColor === oldColor) room.turnColor = targetOppositeColor;
+                            
+                            io.to(data.roomId).emit('migrateColor', { oldColor: oldColor, newColor: targetOppositeColor });
+                        }
+                    }
+                }
+
                 room.activeColors = room.players.map(p => p.color);
                 room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
                 
@@ -135,9 +162,7 @@ io.on('connection', (socket) => {
             room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
             
             room.turnColor = room.activeColors[0]; 
-            room.activeColors.forEach(c => {
-                room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
-            });
+            room.activeColors.forEach(c => { room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 }; });
             io.to(roomId).emit('gameStarted', { activeColors: room.activeColors, turnColor: room.turnColor });
         }
     });
@@ -146,9 +171,7 @@ io.on('connection', (socket) => {
         let room = rooms[roomId];
         if(room && room.host === socket.id) {
             room.turnColor = room.activeColors[0];
-            room.activeColors.forEach(c => {
-                room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
-            });
+            room.activeColors.forEach(c => { room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 }; });
             io.to(roomId).emit('gameRestarted', { activeColors: room.activeColors, turnColor: room.turnColor });
         }
     });
@@ -157,9 +180,7 @@ io.on('connection', (socket) => {
         let room = rooms[data.roomId];
         if(!room || room.turnColor !== data.color) return;
 
-        if (!room.rollStats[data.color]) {
-            room.rollStats[data.color] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
-        }
+        if (!room.rollStats[data.color]) room.rollStats[data.color] = { count: 0, target: 4 };
 
         let stats = room.rollStats[data.color];
         stats.count++;
@@ -170,14 +191,10 @@ io.on('connection', (socket) => {
             stats.count = 0;
             stats.target = Math.floor(Math.random() * 3) + 4;
         }
-        
         io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
     });
 
-    // CRUCIAL SYNC FIX: Pass exact 'roll' value to all clients so no one calculates wrong targets!
-    socket.on('moveToken', (data) => {
-        io.to(data.roomId).emit('tokenMoved', { color: data.color, idx: data.idx, roll: data.roll });
-    });
+    socket.on('moveToken', (data) => { io.to(data.roomId).emit('tokenMoved', { color: data.color, idx: data.idx, roll: data.roll }); });
 
     socket.on('passTurn', (data) => {
         let room = rooms[data.roomId];
@@ -188,15 +205,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('sendInteraction', (data) => {
-        io.to(data.roomId).emit('showInteraction', { color: data.color, type: data.type, content: data.content });
-    });
+    socket.on('sendInteraction', (data) => { io.to(data.roomId).emit('showInteraction', { color: data.color, type: data.type, content: data.content }); });
 
     socket.on('disconnect', () => {
         for (let roomId in rooms) {
             let room = rooms[roomId];
-            
-            // Clean up pending requests if any
             if(room.pendingRequests && room.pendingRequests[socket.id]) delete room.pendingRequests[socket.id];
 
             let pIndex = room.players.findIndex(p => p.id === socket.id);
@@ -219,6 +232,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => { console.log(`Server running on port ${PORT}`); });
