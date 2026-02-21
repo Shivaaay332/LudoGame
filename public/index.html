@@ -20,7 +20,7 @@
         /* LOBBY UI */
         #lobby { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; }
         .lobby-box { background: #24243e; padding: 30px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px rgba(0,255,255,0.2); width: 90%; max-width: 400px;}
-        input { padding: 12px; font-size: 18px; border-radius: 8px; border: none; text-align: center; outline: none; margin-bottom: 15px; width: 100%; font-weight: bold; }
+        input { padding: 12px; font-size: 16px; border-radius: 8px; border: none; text-align: center; outline: none; margin-bottom: 15px; width: 100%; font-weight: bold; }
         button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; font-size: 18px; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;}
         button:active { transform: scale(0.95); }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -30,9 +30,9 @@
         /* POPUP MODALS */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; }
         .req-box { background: #1a1a2e; padding: 25px; border-radius: 12px; text-align: center; border: 2px solid var(--yellow); width: 85%; max-width: 350px;}
-        .kick-btn { background: var(--red); padding: 6px 12px; font-size: 14px; border-radius: 6px; margin-left: 10px; cursor: pointer; display: inline-block; width: auto; font-weight: bold;}
+        .kick-btn { background: var(--red); padding: 4px 8px; font-size: 12px; border-radius: 4px; margin-left: 10px; cursor: pointer; display: inline-block; width: auto; font-weight: bold;}
 
-        /* HEADER & ADMIN PANEL */
+        /* HEADER */
         header { width: 100%; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); flex-shrink: 0; z-index: 10;}
         .main-container { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
 
@@ -52,12 +52,7 @@
 
         .cell { border: 1px solid var(--border-color); position: relative; display: flex; justify-content: center; align-items: center; }
         .cell.has-many { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 2px; }
-        
-        /* SAFE ZONE */
-        .safe-zone {
-            background-color: rgba(0,0,0,0.1);
-            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 3px, transparent 3px, transparent 6px);
-        }
+        .safe-zone { background-color: rgba(0,0,0,0.1); background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.4) 0, rgba(255,255,255,0.4) 3px, transparent 3px, transparent 6px); }
 
         .base { position: absolute; width: 40%; height: 40%; border: 2px solid white; display: flex; justify-content: center; align-items: center; flex-direction: column;}
         .base-red { top: 0; left: 0; background: var(--red); } .base-green { top: 0; right: 0; background: var(--green); } .base-yellow { bottom: 0; right: 0; background: var(--yellow); } .base-blue { bottom: 0; left: 0; background: var(--blue); }
@@ -97,9 +92,38 @@
         .tri { position: absolute; width: 100%; height: 100%; overflow: hidden; }
         .tri-top { background: var(--green); clip-path: polygon(0 0, 100% 0, 50% 50%); } .tri-right { background: var(--yellow); clip-path: polygon(100% 0, 100% 100%, 50% 50%); } .tri-bottom { background: var(--blue); clip-path: polygon(0 100%, 100% 100%, 50% 50%); } .tri-left { background: var(--red); clip-path: polygon(0 0, 0 100%, 50% 50%); }
 
-        .status-container { padding: 15px; text-align: center; width: 100%; z-index: 10; }
-        .status-text { font-size: 18px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 8px 25px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; }
-        #myColorDisp { font-size: 14px; margin-top: 8px; color: #ddd; }
+        /* FOOTER & CHAT */
+        .footer { padding: 10px 15px; width: 100%; z-index: 10; position: relative; }
+        .status-container { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .status-text { font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.2); display: inline-block; }
+        #myColorDisp { font-size: 12px; margin-top: 4px; color: #ddd; text-align: left;}
+
+        /* EMOJI & CHAT SYSTEM */
+        .btn-interact { background: #24243e; border: 2px solid var(--blue); color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 18px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s;}
+        .btn-interact:active { transform: scale(0.9); }
+        
+        .interaction-menu { display: none; position: absolute; bottom: 60px; right: 15px; background: rgba(0,0,0,0.85); border-radius: 10px; padding: 10px; gap: 10px; flex-direction: row; border: 1px solid #555; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
+        .chat-menu { flex-direction: column; width: max-content; right: 65px; }
+        .interact-item { font-size: 24px; cursor: pointer; transition: transform 0.2s; }
+        .interact-item:active { transform: scale(1.3); }
+        .chat-item { font-size: 14px; font-weight: bold; padding: 8px 12px; background: rgba(255,255,255,0.1); border-radius: 6px; color: white; }
+        .chat-item:active { background: var(--blue); transform: scale(0.95); }
+
+        .floating-anim {
+            position: absolute; z-index: 500; pointer-events: none;
+            animation: floatUp 3s ease-out forwards;
+            transform: rotate(calc(var(--board-rot, 0deg) * -1));
+        }
+        .float-emoji { font-size: 40px; }
+        .float-chat { font-size: 13px; font-weight: bold; background: white; color: black; padding: 5px 10px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); white-space: nowrap; border: 2px solid #222;}
+        
+        @keyframes floatUp {
+            0% { opacity: 0; margin-top: 0; transform: scale(0.5) rotate(calc(var(--board-rot, 0deg) * -1)); }
+            15% { opacity: 1; transform: scale(1.1) rotate(calc(var(--board-rot, 0deg) * -1)); }
+            85% { opacity: 1; transform: scale(1) rotate(calc(var(--board-rot, 0deg) * -1)); }
+            100% { opacity: 0; margin-top: -60px; transform: scale(1) rotate(calc(var(--board-rot, 0deg) * -1)); }
+        }
+
     </style>
 </head>
 <body onclick="initAudio()">
@@ -107,7 +131,8 @@
 
     <div id="lobby">
         <div class="lobby-box">
-            <h1 style="color:var(--yellow); margin-bottom: 10px;">Ludo Multiplayer</h1>
+            <h1 style="color:var(--yellow); margin-bottom: 20px;">Ludo Multiplayer</h1>
+            <input type="text" id="playerNameInput" placeholder="Enter Your Name" maxlength="10">
             <input type="text" id="roomIdInput" placeholder="Enter Room Code">
             <button id="joinBtn" onclick="joinRoom()">Join Game</button>
             <div id="lobbyStatus" style="margin-top: 15px; color:#aaa; font-weight:bold;"></div>
@@ -118,6 +143,7 @@
     <div id="joinRequestModal" class="modal-overlay">
         <div class="req-box">
             <h3 style="color:white; margin-bottom:15px;">New Player Wants to Join!</h3>
+            <p id="reqPlayerName" style="color:var(--yellow); margin-bottom:15px; font-weight:bold;"></p>
             <div style="display:flex; gap:10px;">
                 <button style="background:var(--green);" onclick="answerJoinReq(true)">Accept</button>
                 <button style="background:var(--red);" onclick="answerJoinReq(false)">Reject</button>
@@ -134,7 +160,10 @@
     </div>
 
     <header>
-        <h2>Ludo Pro</h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <h2>Ludo Pro</h2>
+            <button id="soundBtn" style="background:transparent; font-size:20px; padding:0; width:auto; box-shadow:none;" onclick="toggleSound()">🔊</button>
+        </div>
         <div style="display:flex; gap: 6px; align-items: center;">
             <div id="roomCodeDisplay" style="font-weight: bold; color: var(--yellow); font-size: 14px;">Room: ---</div>
             <button id="adminBtn" class="btn-green" style="padding: 4px 8px; font-size: 12px; width:auto; display:none;" onclick="document.getElementById('adminModal').style.display='flex'">⚙️</button>
@@ -155,20 +184,43 @@
         </div>
     </div>
 
-    <div class="status-container">
-        <div class="status-text" id="turnStatus">Game not started...</div>
-        <div id="myColorDisp"></div>
+    <div class="footer">
+        <div class="status-container">
+            <div>
+                <div class="status-text" id="turnStatus">Game not started...</div>
+                <div id="myColorDisp"></div>
+            </div>
+            
+            <div style="display:flex; gap:10px; position:relative;">
+                <div class="interaction-menu" id="emojiMenu">
+                    <div class="interact-item" onclick="sendInteract('emoji', '😂')">😂</div>
+                    <div class="interact-item" onclick="sendInteract('emoji', '😡')">😡</div>
+                    <div class="interact-item" onclick="sendInteract('emoji', '😭')">😭</div>
+                    <div class="interact-item" onclick="sendInteract('emoji', '🥳')">🥳</div>
+                    <div class="interact-item" onclick="sendInteract('emoji', '👍')">👍</div>
+                </div>
+                <div class="interaction-menu chat-menu" id="chatMenu">
+                    <div class="interact-item chat-item" onclick="sendInteract('chat', 'Jaldi chal bhai! ⏳')">Jaldi chal bhai! ⏳</div>
+                    <div class="interact-item chat-item" onclick="sendInteract('chat', 'Kya kismat hai! 😲')">Kya kismat hai! 😲</div>
+                    <div class="interact-item chat-item" onclick="sendInteract('chat', 'Arre yaar! 🤦‍♂️')">Arre yaar! 🤦‍♂️</div>
+                    <div class="interact-item chat-item" onclick="sendInteract('chat', 'Bhai maar mat! 🙏')">Bhai maar mat! 🙏</div>
+                </div>
+
+                <div class="btn-interact" onclick="toggleMenu('chatMenu')" style="display:none;" id="mainChatBtn">💬</div>
+                <div class="btn-interact" onclick="toggleMenu('emojiMenu')" style="display:none;" id="mainEmojiBtn">😀</div>
+            </div>
+        </div>
     </div>
 
     <script>
         const socket = io(); 
-        let myRoomId = "", myColor = "", isHost = false;
+        let myRoomId = "", myColor = "", myName = "", isHost = false;
         let winnersRanking = [];
+        let roomPlayersInfo = []; 
         let pendingJoinReqId = null;
+        let soundEnabled = true;
         
-        // Perspective Rotation Math
         const colorRotations = { 'blue': '0deg', 'red': '-90deg', 'green': '180deg', 'yellow': '90deg' };
-        
         const dicePatterns = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
         const starPositions = [[7,2], [3,7], [2,9], [7,13], [9,14], [13,9], [14,7], [9,3]]; 
         const mainPath = [[7,2],[7,3],[7,4],[7,5],[7,6], [6,7],[5,7],[4,7],[3,7],[2,7],[1,7], [1,8],[1,9],[2,9],[3,9],[4,9],[5,9],[6,9], [7,10],[7,11],[7,12],[7,13],[7,14],[7,15], [8,15],[9,15],[9,14],[9,13],[9,12],[9,11],[9,10], [10,9],[11,9],[12,9],[13,9],[14,9],[15,9], [15,8],[15,7],[14,7],[13,7],[12,7],[11,7],[10,7], [9,6],[9,5],[9,4],[9,3],[9,2],[9,1], [8,1],[7,1]];
@@ -177,9 +229,41 @@
         let activeColors = [];
         let gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
         let currentTurnColor = '';
+        
+        // ANTI-FREEZE LOCKS
         let currentRoll = 0, hasRolled = false, isAnimating = false, isRequestingRoll = false;
         let cells = {};
 
+        // --- SOUND ---
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundBtn').innerText = soundEnabled ? "🔊" : "🔇";
+            if(soundEnabled) playSound('move');
+        }
+
+        // --- EMOJI / CHAT ---
+        function toggleMenu(menuId) {
+            document.getElementById('emojiMenu').style.display = 'none';
+            document.getElementById('chatMenu').style.display = 'none';
+            document.getElementById(menuId).style.display = 'flex';
+        }
+        function sendInteract(type, content) {
+            document.getElementById('emojiMenu').style.display = 'none';
+            document.getElementById('chatMenu').style.display = 'none';
+            socket.emit('sendInteraction', { roomId: myRoomId, color: myColor, type: type, content: content });
+        }
+        socket.on('showInteraction', (data) => {
+            let base = document.getElementById(`base-${data.color}`);
+            if(base) {
+                let el = document.createElement('div');
+                el.className = data.type === 'emoji' ? 'floating-anim float-emoji' : 'floating-anim float-chat';
+                el.innerText = data.content;
+                base.appendChild(el);
+                setTimeout(() => el.remove(), 3000); 
+            }
+        });
+
+        // --- BOARD ---
         function initEmptyBoard() {
             const board = document.getElementById('board');
             for(let r=1; r<=15; r++) {
@@ -198,7 +282,6 @@
         }
 
         function buildActiveBases() {
-            // FIX: Purani saari gotiyan aur bases delete karo taaki double na hon
             document.querySelectorAll('.token').forEach(t => t.remove());
             document.querySelectorAll('.base').forEach(e => e.remove());
 
@@ -230,48 +313,57 @@
             });
         }
 
+        function getPlayerName(col) {
+            let p = roomPlayersInfo.find(x => x.color === col);
+            return p ? p.name : col;
+        }
+
         // --- LOBBY LOGIC ---
         function joinRoom() {
-            const input = document.getElementById('roomIdInput').value;
-            if(!input) return alert("Enter Room Code!");
+            let inputName = document.getElementById('playerNameInput').value.trim();
+            if(!inputName) inputName = "Player";
+            const inputCode = document.getElementById('roomIdInput').value.trim();
+            if(!inputCode) return alert("Enter Room Code!");
             
+            document.getElementById('playerNameInput').style.display = 'none';
             document.getElementById('roomIdInput').style.display = 'none';
             document.getElementById('joinBtn').style.display = 'none';
             document.getElementById('lobbyStatus').innerHTML = "Connecting...";
             
-            myRoomId = input;
-            socket.emit('joinRoom', myRoomId);
+            myRoomId = inputCode;
+            socket.emit('joinRoom', { id: myRoomId, name: inputName });
         }
 
         socket.on('errorMsg', (msg) => {
             alert(msg);
+            document.getElementById('playerNameInput').style.display = 'block';
             document.getElementById('roomIdInput').style.display = 'block';
             document.getElementById('joinBtn').style.display = 'block';
             document.getElementById('lobbyStatus').innerHTML = "";
         });
 
         socket.on('joined', (data) => {
+            document.getElementById('playerNameInput').style.display = 'none';
             document.getElementById('roomIdInput').style.display = 'none';
             document.getElementById('joinBtn').style.display = 'none';
             
-            myColor = data.color; isHost = data.isHost;
+            myColor = data.color; isHost = data.isHost; myName = data.name;
             document.getElementById('roomCodeDisplay').innerText = `Room: ${data.roomId}`;
-            document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myColor.toUpperCase()}</b>`;
+            document.getElementById('myColorDisp').innerHTML = `You are playing as <b style="color:var(--${myColor})">${myName} (${myColor.toUpperCase()})</b>`;
             document.getElementById('gameWrapper').style.setProperty('--board-rot', colorRotations[myColor]);
         });
 
         socket.on('updatePlayers', (players) => {
+            roomPlayersInfo = players; 
             let lobbyText = "Players Joined:<br><br>";
             let adminText = "";
 
             players.forEach((p, i) => { 
-                lobbyText += `<div style="margin-bottom:5px;">${i+1}. ${p.color.toUpperCase()}</div>`;
+                lobbyText += `<div style="margin-bottom:5px;">${i+1}. ${p.name} (${p.color.toUpperCase()})</div>`;
                 
-                // Build Admin Panel List
                 let status = p.online ? "🟢" : "🔴";
                 adminText += `<div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-weight:bold; font-size:16px;">${i+1}. ${p.color.toUpperCase()} ${status}</span>`;
-                // FIX: KICK BUTTON ADDED
+                                <span style="font-weight:bold; font-size:14px;">${i+1}. ${p.name} ${status}</span>`;
                 if(isHost && p.id !== socket.id) {
                     adminText += `<button class="kick-btn" onclick="kickPlayer('${p.id}')">KICK</button>`;
                 }
@@ -294,6 +386,7 @@
                 if(!isHost) lobbyText += "<br>Waiting for Host to start..."; 
             }
             document.getElementById('lobbyStatus').innerHTML = lobbyText;
+            updateTurnStatus();
         });
 
         socket.on('playerStatus', (data) => {
@@ -314,22 +407,20 @@
 
         socket.on('playerKicked', (data) => {
             activeColors = data.activeColors;
-            gameState[data.color] = [-1, -1, -1, -1]; // Remove their tokens
-            // Remove their tokens physically from DOM immediately
+            gameState[data.color] = [-1, -1, -1, -1]; 
             document.querySelectorAll(`.token.${data.color}`).forEach(t => t.remove());
-            
             buildActiveBases();
             render();
             document.getElementById('adminModal').style.display = 'none';
         });
 
-        // --- MID GAME JOIN LOGIC ---
         socket.on('waitingForHostApproval', () => {
             document.getElementById('lobbyStatus').innerHTML = "Waiting for Host to approve your entry...";
         });
 
         socket.on('joinRequest', (data) => {
             pendingJoinReqId = data.requesterId;
+            document.getElementById('reqPlayerName').innerText = `${data.requesterName} wants to join!`;
             document.getElementById('joinRequestModal').style.display = 'flex';
         });
 
@@ -340,6 +431,8 @@
 
         socket.on('midGameJoin', (data) => {
             document.getElementById('lobby').style.display = 'none'; 
+            document.getElementById('mainEmojiBtn').style.display = 'flex';
+            document.getElementById('mainChatBtn').style.display = 'flex';
             activeColors = data.activeColors;
             currentTurnColor = data.turnColor;
             if(data.gameState) gameState = data.gameState; 
@@ -353,6 +446,9 @@
 
         socket.on('gameStarted', (data) => {
             document.getElementById('lobby').style.display = 'none';
+            document.getElementById('mainEmojiBtn').style.display = 'flex'; 
+            document.getElementById('mainChatBtn').style.display = 'flex';
+            
             if(isHost) document.getElementById('restartBtn').style.display = 'block';
             activeColors = data.activeColors;
             currentTurnColor = data.turnColor;
@@ -371,16 +467,25 @@
             gameState = { red: [-1,-1,-1,-1], green: [-1,-1,-1,-1], yellow: [-1,-1,-1,-1], blue: [-1,-1,-1,-1] };
             document.querySelectorAll('.winner-display').forEach(w => w.style.display = 'none');
             
-            buildActiveBases(); // Will automatically wipe old tokens due to the fix above
+            buildActiveBases(); 
             currentRoll = 0; hasRolled = false; isAnimating = false; isRequestingRoll = false;
             updateTurnStatus(); render();
         });
 
-        // --- GAMEPLAY LOGIC ---
+        // --- GAMEPLAY LOGIC (ANTI-FREEZE SYSTEM) ---
         function requestDiceRoll(color) {
             if (currentTurnColor !== color || myColor !== color || isAnimating || hasRolled || isRequestingRoll || winnersRanking.includes(color)) return; 
+            
             isRequestingRoll = true; 
             socket.emit('rollDice', { roomId: myRoomId, color: color });
+
+            // SAFETY UNLOCK: Agar server 2 second tak respond na kare, toh dice automatically unlock ho jayega
+            setTimeout(() => {
+                if (isRequestingRoll) {
+                    isRequestingRoll = false;
+                    console.log("Anti-Freeze: Dice auto-unlocked.");
+                }
+            }, 2000);
         }
 
         socket.on('diceRolled', (data) => {
@@ -388,6 +493,7 @@
             isAnimating = true; playSound('dice');
             const d = document.getElementById(`dice-${data.color}`); 
             if(d) d.classList.add('rolling');
+            
             setTimeout(() => {
                 currentRoll = data.roll;
                 if(d) d.classList.remove('rolling'); 
@@ -410,7 +516,7 @@
                     setTimeout(() => socket.emit('passTurn', {roomId: myRoomId}), 800);
                 } 
                 else if(playable.length === 1) { 
-                    setTimeout(() => requestTokenMove(color, playable[0]), 400);
+                    setTimeout(() => requestTokenMove(color, playable[0]), 400); 
                 }
             }
         }
@@ -427,47 +533,55 @@
         }
 
         socket.on('tokenMoved', async (data) => {
-            isAnimating = true; let color = data.color; let idx = data.idx;
-            let currentPos = gameState[color][idx]; let target = (currentPos===-1) ? 0 : currentPos+currentRoll;
+            isAnimating = true; 
+            let extraTurn = false;
+            let color = data.color; 
             
-            if(currentPos === -1) { gameState[color][idx] = 0; playSound('move'); render(); await new Promise(r => setTimeout(r, 200)); } 
-            else { for(let p=currentPos+1; p<=target; p++) { gameState[color][idx] = p; playSound('move'); render(); await new Promise(r => setTimeout(r, 150)); } }
-            
-            let extraTurn = (currentRoll === 6);
-            
-            if(target === 56) {
-                extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
-                if(gameState[color].every(p => p === 56)) {
-                    if(!winnersRanking.includes(color)) winnersRanking.push(color);
-                    let disp = document.getElementById(`win-disp-${color}`);
-                    disp.innerHTML = `🏆<br>Winner #${winnersRanking.length}`; disp.style.display = 'flex';
-                }
-            } else if(target <= 50) { 
-                let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
-                let killed = false;
+            // SAFETY WRAPPER: Try...Finally guarantees 'isAnimating' will never freeze the game
+            try {
+                let idx = data.idx;
+                let currentPos = gameState[color][idx]; let target = (currentPos===-1) ? 0 : currentPos+currentRoll;
                 
-                for (const c of activeColors) {
-                    if (c === color) continue; 
-                    for (let i = 0; i < gameState[c].length; i++) {
-                        let enemyPos = gameState[c][i];
-                        if(enemyPos !== -1 && enemyPos <= 50) {
-                            let enemyIdx = (enemyPos + {red:0, green:13, yellow:26, blue:39}[c])%52;
-                            if (myGlobalIdx === enemyIdx && !starPositions.some(s => s[0]===mainPath[myGlobalIdx][0] && s[1]===mainPath[myGlobalIdx][1])) {
-                                extraTurn = true; playSound('kill');
-                                for(let k = enemyPos; k >= -1; k--) { gameState[c][i] = k; render(); await new Promise(r => setTimeout(r, 30)); }
-                                killed = true; break; 
+                if(currentPos === -1) { gameState[color][idx] = 0; playSound('move'); render(); await new Promise(r => setTimeout(r, 200)); } 
+                else { for(let p=currentPos+1; p<=target; p++) { gameState[color][idx] = p; playSound('move'); render(); await new Promise(r => setTimeout(r, 150)); } }
+                
+                extraTurn = (currentRoll === 6);
+                
+                if(target === 56) {
+                    extraTurn = true; playSound('halal'); launchFireworks(getComputedStyle(document.documentElement).getPropertyValue(`--${color}`));
+                    if(gameState[color].every(p => p === 56)) {
+                        if(!winnersRanking.includes(color)) winnersRanking.push(color);
+                        let disp = document.getElementById(`win-disp-${color}`);
+                        disp.innerHTML = `🏆<br>Winner #${winnersRanking.length}`; disp.style.display = 'flex';
+                    }
+                } else if(target <= 50) { 
+                    let myGlobalIdx = (target + {red:0, green:13, yellow:26, blue:39}[color])%52;
+                    let killed = false;
+                    
+                    for (const c of activeColors) {
+                        if (c === color) continue; 
+                        for (let i = 0; i < gameState[c].length; i++) {
+                            let enemyPos = gameState[c][i];
+                            if(enemyPos !== -1 && enemyPos <= 50) {
+                                let enemyIdx = (enemyPos + {red:0, green:13, yellow:26, blue:39}[c])%52;
+                                if (myGlobalIdx === enemyIdx && !starPositions.some(s => s[0]===mainPath[myGlobalIdx][0] && s[1]===mainPath[myGlobalIdx][1])) {
+                                    extraTurn = true; playSound('kill');
+                                    for(let k = enemyPos; k >= -1; k--) { gameState[c][i] = k; render(); await new Promise(r => setTimeout(r, 30)); }
+                                    killed = true; break; 
+                                }
                             }
                         }
+                        if(killed) break;
                     }
-                    if(killed) break;
                 }
-            }
-
-            isAnimating = false;
-            
-            if (color === myColor) {
-                if(extraTurn && !winnersRanking.includes(color)) updateTurnStatus(); 
-                else socket.emit('passTurn', {roomId: myRoomId});
+            } catch (error) {
+                console.error("Animation Error:", error);
+            } finally {
+                isAnimating = false;
+                if (color === myColor) {
+                    if(extraTurn && !winnersRanking.includes(color)) updateTurnStatus(); 
+                    else socket.emit('passTurn', {roomId: myRoomId});
+                }
             }
         });
 
@@ -477,9 +591,14 @@
         });
 
         function updateTurnStatus() {
-            if(activeColors.length <= 1) return;
+            if(activeColors.length === 0) return;
             
-            if(winnersRanking.length >= activeColors.length - 1) { 
+            // FORCE UNLOCK: Clear all locks whenever a turn changes to prevent freezing
+            isAnimating = false;
+            hasRolled = false;
+            isRequestingRoll = false;
+
+            if(winnersRanking.length >= activeColors.length - 1 && activeColors.length > 1) { 
                 let statusEl = document.getElementById('turnStatus');
                 statusEl.innerHTML = "Game Over! 🏁";
                 statusEl.style.color = "white";
@@ -488,15 +607,26 @@
 
             let color = currentTurnColor;
             
+            if(winnersRanking.includes(color)) {
+                if(color === myColor) socket.emit('passTurn', {roomId: myRoomId});
+                return;
+            }
+
+            let pName = getPlayerName(color);
             let statusEl = document.getElementById('turnStatus');
-            if (color === myColor) statusEl.innerHTML = `YOUR TURN! 🎲`; else statusEl.innerHTML = `${color.toUpperCase()}'s Turn`;
+            
+            if (color === myColor) {
+                statusEl.innerHTML = `🎲 YOUR TURN (${myName.toUpperCase()})!`;
+            } else {
+                statusEl.innerHTML = `⏳ ${pName.toUpperCase()}'s Turn (${color.toUpperCase()})`;
+            }
             
             statusEl.style.color = `var(--${color})`;
-            document.querySelectorAll('.dice-box').forEach(d => d.classList.remove('active-dice-box'));
-            if(document.getElementById(`dice-${color}`)) document.getElementById(`dice-${color}`).classList.add('active-dice-box');
             
-            hasRolled = false;
-            isRequestingRoll = false;
+            document.querySelectorAll('.dice-box').forEach(d => d.classList.remove('active-dice-box'));
+            if(document.getElementById(`dice-${color}`)) {
+                document.getElementById(`dice-${color}`).classList.add('active-dice-box');
+            }
         }
 
         function drawDice(color, num) {
@@ -527,7 +657,7 @@
         let audioCtx;
         function initAudio() { if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
         function playSound(type) {
-            if(!audioCtx || audioCtx.state === 'suspended') return;
+            if(!audioCtx || audioCtx.state === 'suspended' || !soundEnabled) return;
             const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
             if (type === 'dice') { osc.type = 'triangle'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1); gain.gain.setValueAtTime(0.5, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
