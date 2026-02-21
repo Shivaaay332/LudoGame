@@ -41,7 +41,8 @@ io.on('connection', (socket) => {
         if (room.players.some(p => p.id === socket.id)) {
             let pIndex = room.players.findIndex(p => p.id === socket.id);
             socket.emit('joined', { color: room.players[pIndex].color, roomId: roomId, isHost: room.host === socket.id, name: room.players[pIndex].name });
-            io.to(roomId).emit('updatePlayers', room.players);
+            // ✨ FIX: Now sending hostId to keep everyone perfectly synced
+            io.to(roomId).emit('updatePlayers', { players: room.players, hostId: room.host });
             return;
         }
 
@@ -60,7 +61,7 @@ io.on('connection', (socket) => {
         
         socket.join(roomId);
         socket.emit('joined', { color: assignedColor, roomId: roomId, isHost: room.host === socket.id, name: playerName });
-        io.to(roomId).emit('updatePlayers', room.players);
+        io.to(roomId).emit('updatePlayers', { players: room.players, hostId: room.host });
     });
 
     socket.on('handleJoinRequest', (data) => {
@@ -86,7 +87,7 @@ io.on('connection', (socket) => {
             reqSocket.join(data.roomId);
             reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false, name: reqName });
             
-            io.to(data.roomId).emit('updatePlayers', room.players);
+            io.to(data.roomId).emit('updatePlayers', { players: room.players, hostId: room.host });
             io.to(data.roomId).emit('midGameJoin', { 
                 activeColors: room.activeColors, 
                 newColor: assignedColor, 
@@ -115,7 +116,6 @@ io.on('connection', (socket) => {
 
                 room.players.splice(pIndex, 1);
                 
-                // ✨ MAGIC FEATURE: Face-to-Face Role Switch ✨
                 if (room.players.length === 2 && room.status === 'playing') {
                     let hostP = room.players.find(p => p.id === room.host);
                     let oppP = room.players.find(p => p.id !== room.host);
@@ -126,10 +126,8 @@ io.on('connection', (socket) => {
                             let oldColor = oppP.color;
                             oppP.color = targetOppositeColor;
                             
-                            // Swap stat tracker
                             room.rollStats[targetOppositeColor] = room.rollStats[oldColor];
                             delete room.rollStats[oldColor];
-                            
                             if(room.turnColor === oldColor) room.turnColor = targetOppositeColor;
                             
                             io.to(data.roomId).emit('migrateColor', { oldColor: oldColor, newColor: targetOppositeColor });
@@ -146,7 +144,7 @@ io.on('connection', (socket) => {
                     targetSocket.leave(data.roomId);
                 }
                 
-                io.to(data.roomId).emit('updatePlayers', room.players);
+                io.to(data.roomId).emit('updatePlayers', { players: room.players, hostId: room.host });
                 io.to(data.roomId).emit('playerKicked', { color: kickedColor, activeColors: room.activeColors });
 
                 if (room.players.length === 0) delete rooms[data.roomId];
@@ -217,13 +215,16 @@ io.on('connection', (socket) => {
                 room.players[pIndex].online = false;
                 io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
                 
+                // ✨ HOST MIGRATION LOGIC ✨
                 if (room.players.every(p => !p.online)) {
-                    delete rooms[roomId];
+                    delete rooms[roomId]; // Room totally empty, destroy it
                 } else if (room.host === socket.id) {
+                    // Find the oldest player who is still online
                     let newHost = room.players.find(p => p.online);
                     if(newHost) {
-                        room.host = newHost.id;
-                        io.to(roomId).emit('updatePlayers', room.players);
+                        room.host = newHost.id; // Assign new host
+                        // Broadcast the update so the new host gets their powers instantly!
+                        io.to(roomId).emit('updatePlayers', { players: room.players, hostId: room.host });
                     }
                 }
             }
