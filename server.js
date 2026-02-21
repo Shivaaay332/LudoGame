@@ -10,13 +10,15 @@ app.use(express.static('public'));
 
 const rooms = {};
 
-// 1. JOIN ORDER: Blue, Green (Opposite), Red, Yellow
 const assignmentOrder = ['blue', 'green', 'red', 'yellow'];
-// 2. TURN ORDER (Clockwise): Blue, Red, Green, Yellow
 const turnOrder = ['blue', 'red', 'green', 'yellow'];
 
 io.on('connection', (socket) => {
-    socket.on('joinRoom', (roomId) => {
+
+    socket.on('joinRoom', (data) => {
+        let roomId = data.id;
+        let playerName = data.name || 'Player';
+
         if (!roomId || typeof roomId !== 'string') return;
         
         if (!rooms[roomId]) {
@@ -30,7 +32,7 @@ io.on('connection', (socket) => {
 
         if (room.players.some(p => p.id === socket.id)) {
             let pIndex = room.players.findIndex(p => p.id === socket.id);
-            socket.emit('joined', { color: room.players[pIndex].color, roomId: roomId, isHost: room.host === socket.id });
+            socket.emit('joined', { color: room.players[pIndex].color, roomId: roomId, isHost: room.host === socket.id, name: room.players[pIndex].name });
             io.to(roomId).emit('updatePlayers', room.players);
             return;
         }
@@ -40,15 +42,15 @@ io.on('connection', (socket) => {
 
         if (room.status === 'playing') {
             socket.emit('waitingForHostApproval');
-            io.to(room.host).emit('joinRequest', { requesterId: socket.id });
+            io.to(room.host).emit('joinRequest', { requesterId: socket.id, requesterName: playerName });
             return;
         }
 
         let assignedColor = availableColors[0];
-        room.players.push({ id: socket.id, color: assignedColor, online: true });
+        room.players.push({ id: socket.id, color: assignedColor, online: true, name: playerName });
         
         socket.join(roomId);
-        socket.emit('joined', { color: assignedColor, roomId: roomId, isHost: room.host === socket.id });
+        socket.emit('joined', { color: assignedColor, roomId: roomId, isHost: room.host === socket.id, name: playerName });
         io.to(roomId).emit('updatePlayers', room.players);
     });
 
@@ -63,16 +65,15 @@ io.on('connection', (socket) => {
             let availableColors = assignmentOrder.filter(c => !room.players.some(p => p.color === c));
             let assignedColor = availableColors[0];
             
-            room.players.push({ id: data.requesterId, color: assignedColor, online: true });
+            room.players.push({ id: data.requesterId, color: assignedColor, online: true, name: data.requesterName });
             
-            // Sort active colors by CLOCKWISE turn order
             room.activeColors = room.players.map(p => p.color);
             room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
             
             room.rollStats[assignedColor] = { count: 0, target: Math.floor(Math.random()*3)+4 };
             
             reqSocket.join(data.roomId);
-            reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false });
+            reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false, name: data.requesterName });
             
             io.to(data.roomId).emit('updatePlayers', room.players);
             io.to(data.roomId).emit('midGameJoin', { 
@@ -93,7 +94,6 @@ io.on('connection', (socket) => {
             if(pIndex !== -1) {
                 let kickedColor = room.players[pIndex].color;
                 
-                // If it was the kicked player's turn, pass it to the NEXT CLOCKWISE player
                 if (room.status === 'playing' && room.turnColor === kickedColor && room.activeColors.length > 1) {
                     let currentTurnIdx = room.activeColors.indexOf(kickedColor);
                     let nextTurnIdx = (currentTurnIdx + 1) % room.activeColors.length;
@@ -101,7 +101,6 @@ io.on('connection', (socket) => {
                     io.to(data.roomId).emit('turnChanged', { color: room.turnColor });
                 }
 
-                // Remove player
                 room.players.splice(pIndex, 1);
                 room.activeColors = room.players.map(p => p.color);
                 room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
@@ -125,7 +124,6 @@ io.on('connection', (socket) => {
         if(room && room.host === socket.id && room.players.length > 0) {
             room.status = 'playing';
             room.activeColors = room.players.map(p => p.color);
-            // Ensure turn order is CLOCKWISE
             room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
             
             room.turnColor = room.activeColors[0]; 
@@ -151,17 +149,23 @@ io.on('connection', (socket) => {
         let room = rooms[data.roomId];
         if(!room || room.turnColor !== data.color) return;
 
-        let stats = room.rollStats[data.color];
-        if(stats) {
-            stats.count++;
-            let roll = Math.floor(Math.random() * 6) + 1;
-            if (stats.count >= stats.target) roll = 6;
-            if (roll === 6) {
-                stats.count = 0;
-                stats.target = Math.floor(Math.random() * 3) + 4;
-            }
-            io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
+        // ANTI-FREEZE BACKEND FIX: Agar stats null ho toh turant naya bana do
+        if (!room.rollStats[data.color]) {
+            room.rollStats[data.color] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
         }
+
+        let stats = room.rollStats[data.color];
+        stats.count++;
+        let roll = Math.floor(Math.random() * 6) + 1;
+        
+        if (stats.count >= stats.target) roll = 6;
+        
+        if (roll === 6) {
+            stats.count = 0;
+            stats.target = Math.floor(Math.random() * 3) + 4;
+        }
+        
+        io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
     });
 
     socket.on('moveToken', (data) => {
@@ -175,6 +179,10 @@ io.on('connection', (socket) => {
             room.turnColor = room.activeColors[(idx + 1) % room.activeColors.length];
             io.to(data.roomId).emit('turnChanged', { color: room.turnColor });
         }
+    });
+
+    socket.on('sendInteraction', (data) => {
+        io.to(data.roomId).emit('showInteraction', { color: data.color, type: data.type, content: data.content });
     });
 
     socket.on('disconnect', () => {
