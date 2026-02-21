@@ -24,7 +24,8 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) {
             rooms[roomId] = { 
                 players: [], host: socket.id, status: 'waiting',
-                activeColors: [], rollStats: {}, turnColor: ''
+                activeColors: [], rollStats: {}, turnColor: '',
+                pendingRequests: {} // NEW: To store mid-game joiner names
             };
         }
         
@@ -42,6 +43,8 @@ io.on('connection', (socket) => {
 
         if (room.status === 'playing') {
             socket.emit('waitingForHostApproval');
+            // FIX: Store name temporarily on server so it doesn't become 'undefined'
+            room.pendingRequests[socket.id] = playerName;
             io.to(room.host).emit('joinRequest', { requesterId: socket.id, requesterName: playerName });
             return;
         }
@@ -65,7 +68,11 @@ io.on('connection', (socket) => {
             let availableColors = assignmentOrder.filter(c => !room.players.some(p => p.color === c));
             let assignedColor = availableColors[0];
             
-            room.players.push({ id: data.requesterId, color: assignedColor, online: true, name: data.requesterName });
+            // FIX: Retrieve the saved name
+            let reqName = room.pendingRequests[data.requesterId] || 'Player';
+            
+            room.players.push({ id: data.requesterId, color: assignedColor, online: true, name: reqName });
+            delete room.pendingRequests[data.requesterId]; // Clean up memory
             
             room.activeColors = room.players.map(p => p.color);
             room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
@@ -73,7 +80,7 @@ io.on('connection', (socket) => {
             room.rollStats[assignedColor] = { count: 0, target: Math.floor(Math.random()*3)+4 };
             
             reqSocket.join(data.roomId);
-            reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false, name: data.requesterName });
+            reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false, name: reqName });
             
             io.to(data.roomId).emit('updatePlayers', room.players);
             io.to(data.roomId).emit('midGameJoin', { 
@@ -84,6 +91,7 @@ io.on('connection', (socket) => {
             });
         } else {
             reqSocket.emit('errorMsg', 'Host rejected your request or room is full.');
+            if(room.pendingRequests[data.requesterId]) delete room.pendingRequests[data.requesterId];
         }
     });
 
@@ -149,7 +157,6 @@ io.on('connection', (socket) => {
         let room = rooms[data.roomId];
         if(!room || room.turnColor !== data.color) return;
 
-        // ANTI-FREEZE BACKEND FIX: Agar stats null ho toh turant naya bana do
         if (!room.rollStats[data.color]) {
             room.rollStats[data.color] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
         }
@@ -159,7 +166,6 @@ io.on('connection', (socket) => {
         let roll = Math.floor(Math.random() * 6) + 1;
         
         if (stats.count >= stats.target) roll = 6;
-        
         if (roll === 6) {
             stats.count = 0;
             stats.target = Math.floor(Math.random() * 3) + 4;
@@ -168,8 +174,9 @@ io.on('connection', (socket) => {
         io.to(data.roomId).emit('diceRolled', { color: data.color, roll: roll });
     });
 
+    // CRUCIAL SYNC FIX: Pass exact 'roll' value to all clients so no one calculates wrong targets!
     socket.on('moveToken', (data) => {
-        io.to(data.roomId).emit('tokenMoved', { color: data.color, idx: data.idx });
+        io.to(data.roomId).emit('tokenMoved', { color: data.color, idx: data.idx, roll: data.roll });
     });
 
     socket.on('passTurn', (data) => {
@@ -188,8 +195,11 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         for (let roomId in rooms) {
             let room = rooms[roomId];
-            let pIndex = room.players.findIndex(p => p.id === socket.id);
             
+            // Clean up pending requests if any
+            if(room.pendingRequests && room.pendingRequests[socket.id]) delete room.pendingRequests[socket.id];
+
+            let pIndex = room.players.findIndex(p => p.id === socket.id);
             if (pIndex !== -1) {
                 room.players[pIndex].online = false;
                 io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
