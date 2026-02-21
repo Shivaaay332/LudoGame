@@ -10,35 +10,39 @@ app.use(express.static('public'));
 
 const rooms = {};
 
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+// 1. JOIN ORDER: Blue, Green (Opposite), Red, Yellow
+const assignmentOrder = ['blue', 'green', 'red', 'yellow'];
+// 2. TURN ORDER (Clockwise): Blue, Red, Green, Yellow
+const turnOrder = ['blue', 'red', 'green', 'yellow'];
 
+io.on('connection', (socket) => {
     socket.on('joinRoom', (roomId) => {
         if (!roomId || typeof roomId !== 'string') return;
         
         if (!rooms[roomId]) {
-            // ORDER: Blue, Green, Red, Yellow
             rooms[roomId] = { 
                 players: [], host: socket.id, status: 'waiting',
-                colors: ['blue', 'green', 'red', 'yellow'],
-                activeColors: [], rollStats: {} 
+                activeColors: [], rollStats: {}, turnColor: ''
             };
         }
         
         let room = rooms[roomId];
 
-        // Agar user already room me hai to dobara status bhej do (Freeze fix)
-        let pIndex = room.players.findIndex(p => p.id === socket.id);
-        if (pIndex !== -1) {
+        if (room.players.some(p => p.id === socket.id)) {
+            let pIndex = room.players.findIndex(p => p.id === socket.id);
             socket.emit('joined', { color: room.players[pIndex].color, roomId: roomId, isHost: room.host === socket.id });
             io.to(roomId).emit('updatePlayers', room.players);
             return;
         }
 
-        if (room.status === 'playing') return socket.emit('errorMsg', 'Game already started!');
-        
-        let availableColors = room.colors.filter(c => !room.players.some(p => p.color === c));
+        let availableColors = assignmentOrder.filter(c => !room.players.some(p => p.color === c));
         if (availableColors.length === 0) return socket.emit('errorMsg', 'Room is full!');
+
+        if (room.status === 'playing') {
+            socket.emit('waitingForHostApproval');
+            io.to(room.host).emit('joinRequest', { requesterId: socket.id });
+            return;
+        }
 
         let assignedColor = availableColors[0];
         room.players.push({ id: socket.id, color: assignedColor, online: true });
@@ -48,33 +52,104 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('updatePlayers', room.players);
     });
 
+    socket.on('handleJoinRequest', (data) => {
+        let room = rooms[data.roomId];
+        if(!room || room.host !== socket.id) return;
+        
+        let reqSocket = io.sockets.sockets.get(data.requesterId);
+        if(!reqSocket) return;
+
+        if (data.accepted && room.players.length < 4) {
+            let availableColors = assignmentOrder.filter(c => !room.players.some(p => p.color === c));
+            let assignedColor = availableColors[0];
+            
+            room.players.push({ id: data.requesterId, color: assignedColor, online: true });
+            
+            // Sort active colors by CLOCKWISE turn order
+            room.activeColors = room.players.map(p => p.color);
+            room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
+            
+            room.rollStats[assignedColor] = { count: 0, target: Math.floor(Math.random()*3)+4 };
+            
+            reqSocket.join(data.roomId);
+            reqSocket.emit('joined', { color: assignedColor, roomId: data.roomId, isHost: false });
+            
+            io.to(data.roomId).emit('updatePlayers', room.players);
+            io.to(data.roomId).emit('midGameJoin', { 
+                activeColors: room.activeColors, 
+                newColor: assignedColor, 
+                turnColor: room.turnColor,
+                gameState: data.currentGameState 
+            });
+        } else {
+            reqSocket.emit('errorMsg', 'Host rejected your request or room is full.');
+        }
+    });
+
+    socket.on('kickPlayer', (data) => {
+        let room = rooms[data.roomId];
+        if(room && room.host === socket.id) {
+            let pIndex = room.players.findIndex(p => p.id === data.targetId);
+            if(pIndex !== -1) {
+                let kickedColor = room.players[pIndex].color;
+                
+                // If it was the kicked player's turn, pass it to the NEXT CLOCKWISE player
+                if (room.status === 'playing' && room.turnColor === kickedColor && room.activeColors.length > 1) {
+                    let currentTurnIdx = room.activeColors.indexOf(kickedColor);
+                    let nextTurnIdx = (currentTurnIdx + 1) % room.activeColors.length;
+                    room.turnColor = room.activeColors[nextTurnIdx];
+                    io.to(data.roomId).emit('turnChanged', { color: room.turnColor });
+                }
+
+                // Remove player
+                room.players.splice(pIndex, 1);
+                room.activeColors = room.players.map(p => p.color);
+                room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
+                
+                let targetSocket = io.sockets.sockets.get(data.targetId);
+                if(targetSocket) {
+                    targetSocket.emit('kickedOut');
+                    targetSocket.leave(data.roomId);
+                }
+                
+                io.to(data.roomId).emit('updatePlayers', room.players);
+                io.to(data.roomId).emit('playerKicked', { color: kickedColor, activeColors: room.activeColors });
+
+                if (room.players.length === 0) delete rooms[data.roomId];
+            }
+        }
+    });
+
     socket.on('startGame', (roomId) => {
         let room = rooms[roomId];
         if(room && room.host === socket.id && room.players.length > 0) {
             room.status = 'playing';
             room.activeColors = room.players.map(p => p.color);
-            room.turnIdx = 0;
+            // Ensure turn order is CLOCKWISE
+            room.activeColors.sort((a, b) => turnOrder.indexOf(a) - turnOrder.indexOf(b));
+            
+            room.turnColor = room.activeColors[0]; 
             room.activeColors.forEach(c => {
                 room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
             });
-            io.to(roomId).emit('gameStarted', room.activeColors);
+            io.to(roomId).emit('gameStarted', { activeColors: room.activeColors, turnColor: room.turnColor });
         }
     });
 
     socket.on('restartGame', (roomId) => {
         let room = rooms[roomId];
         if(room && room.host === socket.id) {
-            room.turnIdx = 0;
+            room.turnColor = room.activeColors[0];
             room.activeColors.forEach(c => {
                 room.rollStats[c] = { count: 0, target: Math.floor(Math.random() * 3) + 4 };
             });
-            io.to(roomId).emit('gameRestarted', room.activeColors);
+            io.to(roomId).emit('gameRestarted', { activeColors: room.activeColors, turnColor: room.turnColor });
         }
     });
 
     socket.on('rollDice', (data) => {
         let room = rooms[data.roomId];
-        if(!room) return;
+        if(!room || room.turnColor !== data.color) return;
 
         let stats = room.rollStats[data.color];
         if(stats) {
@@ -94,7 +169,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('passTurn', (data) => {
-        io.to(data.roomId).emit('turnChanged');
+        let room = rooms[data.roomId];
+        if(room && room.status === 'playing' && room.activeColors.length > 0) {
+            let idx = room.activeColors.indexOf(room.turnColor);
+            room.turnColor = room.activeColors[(idx + 1) % room.activeColors.length];
+            io.to(data.roomId).emit('turnChanged', { color: room.turnColor });
+        }
     });
 
     socket.on('disconnect', () => {
@@ -103,18 +183,17 @@ io.on('connection', (socket) => {
             let pIndex = room.players.findIndex(p => p.id === socket.id);
             
             if (pIndex !== -1) {
-                if (room.status === 'waiting') {
-                    room.players.splice(pIndex, 1); // Remove player
-                    
-                    if (room.players.length === 0) {
-                        delete rooms[roomId]; // Room free for reuse!
-                    } else {
-                        if (room.host === socket.id) room.host = room.players[0].id; // Assign new host
+                room.players[pIndex].online = false;
+                io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
+                
+                if (room.players.every(p => !p.online)) {
+                    delete rooms[roomId];
+                } else if (room.host === socket.id) {
+                    let newHost = room.players.find(p => p.online);
+                    if(newHost) {
+                        room.host = newHost.id;
                         io.to(roomId).emit('updatePlayers', room.players);
                     }
-                } else {
-                    room.players[pIndex].online = false; // Mark offline
-                    io.to(roomId).emit('playerStatus', { color: room.players[pIndex].color, status: 'offline' });
                 }
             }
         }
